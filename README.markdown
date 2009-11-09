@@ -16,6 +16,7 @@ Todo
      * Change generator power
      * Change demand power   
  4. combine with the Monte Carlo scenario generator
+ 5. add the ability to SCOPF using N-1
 
 Links
 =====
@@ -34,9 +35,20 @@ Links
  5. [http://www.pserc.cornell.edu/matpower/](Matpower)
  6. [http://www.power.uwaterloo.ca/~fmilano/psat.htm](PSAT)
 
+* * * * *
+
 Notes
 =====
 
  * It seems like a waste to start up and shurt down matlab for every simulation.
  * There might be a way to trip out and modify a system while matlab is running in a way that will be much quicker to run
- * 
+
+To Try
+======
+
+ - Settings.distrsw = 1 % use distributed slack bus
+ - Settings.init % status (including PF diverged!)
+ - OPF.conv % did the OPF converge
+ - OPF.report % not sure but should be checked out
+ - clpsat.refresh = 0 % don't bother re-running the PF
+ - clpsat.showopf % not sure

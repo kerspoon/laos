@@ -2,12 +2,23 @@
 
 # make a script that:
 #   clears all (old) log files
-#  runs matlab in text mode and runs an 'm' file
-#    that m file should do the opf and save new log files
-#  parse both log files and return the result. 
+# runs matlab in text mode and runs an 'm' file
+#   that m file should do the opf and save new log files
+# parse both log files and return the result. 
 
-rm rts_*.txt
+filename="rts"
+
+rmfiles=${filename}_*.txt
+file1=${filename}_01.txt
+file2=${filename}_02.txt
+
+echo $rmfiles
+echo $file1 
+echo $file2 
+
+rm -f $rmfiles
 matlab -nodesktop -nodisplay -nojvm -nosplash -r solve
-python parselog.py -t powerflow rts_01.txt
-python parselog.py -t optimalpowerflow rts_02.txt
+python parselog.py -t powerflow $file1
+python parselog.py -t optimalpowerflow $file2
 
+exit 0 

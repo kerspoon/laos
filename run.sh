@@ -6,7 +6,8 @@
 #   that m file should do the opf and save new log files
 # parse both log files and return the result. 
 
-filename="rts"
+# if you are changing this then change it in 'solve.m' too
+filename="test1234"
 
 rmfiles=${filename}_*.txt
 file1=${filename}_01.txt
@@ -23,3 +24,8 @@ python parselog.py -t optimalpowerflow $file2
 
 exit 0 
 
+# if [ eq $# 1 ]; then
+#     filename=$1
+# else
+#     filename="rts"
+# fi

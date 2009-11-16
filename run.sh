@@ -22,3 +22,4 @@ python parselog.py -t powerflow $file1
 python parselog.py -t optimalpowerflow $file2
 
 exit 0 
+

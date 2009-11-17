@@ -43,7 +43,6 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
 
 logger = logging.getLogger(__name__)
 
-
 #------------------------------------------------------------------------------
 #  as_csv :: [T], str -> str
 #------------------------------------------------------------------------------
@@ -101,7 +100,7 @@ class PSAT(object):
         entries = "bus_no s_rating v_rating p q v_max v_min z_conv status".split()
 
     class Shunt(basic):
-        entries = "bus_no  s_rating v_rating f_rating g b status".split()
+        entries = "bus_no s_rating v_rating f_rating g b status".split()
 
     class Demand(basic):
         entries = "bus_no s_rating p_direction q_direction \
@@ -136,6 +135,80 @@ class PSAT(object):
         write_section(stream, self.shunts, "Shunt")
         write_section(stream, self.demand, "Demand")
         write_section(stream, self.supply, "Supply")
+
+    def remove_bus(self, bus_no):
+
+        # list all matches
+        matches = [x for x in self.busses if x.bus_no == bus_no]
+
+        if len(matches) == 0:
+            logger.info("Unable to find item")
+            return
+
+        # bus names must be unique
+        assert len(matches) == 1
+        
+        # remove it 
+        thebus = matches[0].bus_no
+        self.busses.remove(matches[0])
+
+        # kill all connecting items
+        self.lines = filter(lambda x: x.fbus != thebus and x.tbus != thebus, self.lines)
+
+        self.slack = filter(lambda x: x.bus_no != thebus, self.slack) 
+        if len(self.slack) == 0:
+            logger.info("todo: deal with deleting slack bus")
+
+        self.generators = filter(lambda x: x.bus_no != thebus, self.generators)
+        self.loads = filter(lambda x: x.bus_no != thebus, self.loads)
+        self.shunts = filter(lambda x: x.bus_no != thebus, self.shunts)
+        self.demand = filter(lambda x: x.bus_no != thebus, self.demand)
+        self.supply = filter(lambda x: x.bus_no != thebus, self.supply)
+
+    def remove_line(self, fbus, tbus, line_no=None):
+
+        # does the given line (x) match the one we are looking for
+        test = lambda x: (x.fbus == fbus and x.tbus == tbus) or (x.fbus == tbus and x.tbus == fbus)
+
+        # list all matches
+        matches = [x for x in self.lines if test(x)]
+            
+        # remove it 
+        self.remove_item(matches, self.lines, line_no)
+            
+    def remove_generator(self, bus_no, gen_no=None):
+        
+        # todo: deal with only deleting part of generators but 
+        #       all of one supply 
+
+        # list all matches
+        gen_matches = [x for x in self.generators if x.bus_no == bus_no]
+        supply_matches = [x for x in self.supply if x.bus_no == bus_no]
+
+        # remove it 
+        self.remove_item(gen_matches, self.generators, gen_no)
+        self.remove_item(supply_matches, self.supply, gen_no)
+        
+    def remove_item(self, matches, iterable, item_no):
+
+        # error if no matches 
+        if len(matches) == 0:
+            logger.info("Unable to find item")
+        # simple if one match 
+        elif len(matches) == 1:
+            iterable.remove(matches[0])
+        # remove only one if there is more
+        elif len(matches) > 1:
+            # if line number specified use that
+            if item_no:
+                assert item_no < len(matches)
+                iterable.remove(matches[item_no])
+            # otherwise remove first
+            else:
+                iterable.remove(matches[0])
+        else:
+            raise Exception("can't happen")
+
 
 #------------------------------------------------------------------------------
 #  "PSATReader" class:
@@ -552,12 +625,117 @@ class PSATReader(object):
         self.psat.supply.append(PSAT.Supply(tokens))
 
 #------------------------------------------------------------------------------
+#  
+#------------------------------------------------------------------------------
+
+def read_contingency(stream):
+
+    class Contingency: 
+        pass 
+
+    contingencies = []
+
+    def new_section(title, options):
+        cont = Contingency()
+        cont.title = title 
+        cont.options = options
+        cont.kill = {'bus':[], 'generator':[], 'line':[]}
+        cont.supply = {}
+        cont.demand = {}
+        contingencies.append(cont)
+        logger.debug("Added Contingency: %s" % title)
+
+    def add_kill(component, name):
+        # add the kill to the current contingency
+        contingencies[-1].kill[component].append(name)
+        logger.debug("Kill: %s[%s]" % (component, name))
+
+    def set_supply(bus_no, value):
+        contingencies[-1].supply[bus_no] = value
+        logger.debug("Set supply: bus[%s]=%f" % (bus_no, value))
+
+    def set_demand(bus_no, value):
+        contingencies[-1].demand[bus_no] = value
+        logger.debug("Set demand: bus[%s]=%f" % (bus_no, value))
+                
+    for line in stream:
+        line = [x.lower() for x in line.split()]
+        
+        # comments
+        if len(line) == 0 or line[0].startswith("#"):
+            continue
+
+        # title
+        elif line[0].startswith("["):
+            # new title 
+            title = line[0][1:-1]
+            options = set(line[1:])
+            assert options <= set(["pf","opf"])
+            new_section(title, options)
+
+        # remove 
+        elif line[0] == "remove":
+            if line[1] == "bus":
+                bus_no = int(line[2])
+                add_kill("bus",bus_no)
+            elif line[1] == "line":
+                fbus = int(line[2])
+                tbus = int(line[3])
+                add_kill("line", (fbus, tbus))
+            elif line[1] == "generator":
+                bus_no = int(line[2])
+                add_kill("generator",bus_no)
+            else:
+                raise Exception("got %s expected (line, generator, bus)" % line[0])
+                
+        # set
+        elif line[0] == "set":
+            if line[1] == "supply":
+                bus_no = int(line[2])
+                value = float(line[3])
+                set_supply(bus_no, value)
+            elif line[1] == "demand":
+                bus_no = int(line[2])
+                value = float(line[3])
+                set_demand(bus_no, value)
+            else:
+                raise Exception("got %s expected (supply, demand)" % line[0])
+                
+        # nothing else allowed
+        else:
+            raise Exception("got %s expected (remove, set, [...], #)" % line[0])
+
+    return contingencies
+
+def test_read_contingency():
+    import StringIO
+    text = StringIO.StringIO("""
+    [abc]
+        remove bus 1
+        remove bus 1 
+        remove line 1 3
+        remove generator 4
+        set demand 1 1.27
+    [def]
+        set supply 58 0.41
+    [ghi]
+    [jkl]
+        remove generator 2 
+    """)
+    print read_contingency(text)
+test_read_contingency()
+
+#------------------------------------------------------------------------------
 #  "main2" function:
 #------------------------------------------------------------------------------
 
 def main2(infile, outfile):
     readme = PSATReader()
     readme(infile)
+ 
+    # readme.psat.remove_bus(1)
+    # readme.psat.remove_line(11, 10)
+    readme.psat.remove_generator(21)
     readme.psat.write(open(outfile,"w"))
 
 #------------------------------------------------------------------------------
@@ -565,9 +743,9 @@ def main2(infile, outfile):
 #------------------------------------------------------------------------------
 
 def main():
-    """ Parses the command line and call Pylon with the correct data.
+    """ Parses the command line and call with the correct data.
     """
-    parser = optparse.OptionParser("usage: pylon [options] input_file")
+    parser = optparse.OptionParser("usage: program [options] input_file")
 
     parser.add_option("-o", "--output", dest="output", metavar="FILE",
         help="Write the solution report to FILE.")

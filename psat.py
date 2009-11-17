@@ -624,6 +624,11 @@ class PSATReader(object):
         logger.debug("Pushing supply data: %s" % tokens)
         self.psat.supply.append(PSAT.Supply(tokens))
 
+def read_psat(stream):
+    psatreader = PSATReader()
+    psatreader(stream)
+    return psatreader.psat
+
 #------------------------------------------------------------------------------
 #  
 #------------------------------------------------------------------------------
@@ -723,7 +728,7 @@ def test_read_contingency():
         remove generator 2 
     """)
     print read_contingency(text)
-test_read_contingency()
+# test_read_contingency()
 
 #------------------------------------------------------------------------------
 #  "main2" function:

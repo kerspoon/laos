@@ -4,19 +4,8 @@ LAOS
 
 A program to look at the security of the IEEE RTS 96 using PSAT in Matlab. Python is used to generate the files to test. 
 
-Todo
-====
-
- 1. make a script to run opf on a given file from the command line
- 2. from a solved opf, say whether it is an 'acceptable system'
- 3. make a program with the following:
-     * Delete a line
-     * Delete a bus
-     * Delete a generator
-     * Change generator power
-     * Change demand power   
- 4. combine with the Monte Carlo scenario generator
- 5. add the ability to SCOPF using N-1
+A program called kiribati makes a batch file containing a list of scenarios to simulate.
+this is read by laos which will call matlab with a script to perform the desired simulation. The results are parsed by logparser.py
 
 Links
 =====
@@ -40,7 +29,7 @@ Links
 Notes
 =====
 
- * It seems like a waste to start up and shurt down matlab for every simulation.
+ * It seems like a waste to start up and shut down matlab for every simulation.
  * There might be a way to trip out and modify a system while matlab is running in a way that will be much quicker to run
 
 To Try

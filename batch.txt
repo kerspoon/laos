@@ -1,48 +1,48 @@
-[abc] pf
+[rtsbus1] opf
     remove bus 1
-[abc] pf
+[rtsbus2] opf
     remove bus 2
-[abc] pf
+[rtsbus3] opf
     remove bus 3
-[abc] pf
+[rtsbus4] opf
     remove bus 4
-[abc] pf
+[rtsbus5] opf
     remove bus 5
-[abc] pf
+[rtsbus6] opf
     remove bus 6
-[abc] pf
+[rtsbus7] opf
     remove bus 7
-[abc] pf
+[rtsbus8] opf
     remove bus 8
-[abc] pf
+[rtsbus9] opf
     remove bus 9
-[abc] pf
+[rtsbus10] opf
     remove bus 10
-[abc] pf
+[rtsbus11] opf
     remove bus 11
-[abc] pf
+[rtsbus12] opf
     remove bus 12
-[abc] pf
+[rtsbus13] opf
     remove bus 13
-[abc] pf
+[rtsbus14] opf
     remove bus 14
-[abc] pf
+[rtsbus15] opf
     remove bus 15
-[abc] pf
+[rtsbus16] opf
     remove bus 16
-[abc] pf
+[rtsbus17] opf
     remove bus 17
-[abc] pf
+[rtsbus18] opf
     remove bus 18
-[abc] pf
+[rtsbus19] opf
     remove bus 19
-[abc] pf
+[rtsbus20] opf
     remove bus 20
-[abc] pf
+[rtsbus21] opf
     remove bus 21
-[abc] pf
+[rtsbus22] opf
     remove bus 22
-[abc] pf
+[rtsbus23] opf
     remove bus 23
-[abc] pf
+[rtsbus24] opf
     remove bus 24

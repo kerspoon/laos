@@ -142,6 +142,8 @@ def main2(psat_file, batch_file, outfile):
         contingency.result = parselog(contingency.title, contingency.simtype)
         print contingency.result
 
+    for contingency in contingencies:
+        contingency.write(outfile)
     
  
 #------------------------------------------------------------------------------

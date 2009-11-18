@@ -647,8 +647,32 @@ def read_psat(stream):
 
 def read_contingency(stream):
 
-    class Contingency: 
-        pass 
+    class Contingency:
+        def write(self,stream):
+            stream.write("[" + self.title + "] ")
+            
+            if "opf" in options:
+                stream.write("opf\n")
+            else:
+                stream.write("pf\n")
+            
+            for kill in self.kill["bus"]:
+                stream.write("  remove bus " + str(kill) + "\n")
+            for kill in self.kill["line"]:
+                stream.write("  remove line " + as_csv(kill, " ") + "\n")
+            for kill in self.kill["generator"]:
+                stream.write("  remove generator " + str(kill) + "\n")
+            for item in self.supply.items():
+                stream.write("  set supply " + as_csv(item, " ") + "\n")
+            for item in self.demand.items():
+                stream.write("  set demand " + as_csv(item, " ") + "\n")
+            
+            if "result" in self.__dict__:
+                if self.result:
+                    stream.write("  result pass\n")
+                else:
+                    stream.write("  result fail\n")
+                
 
     contingencies = []
 
@@ -723,6 +747,10 @@ def read_contingency(stream):
                 set_demand(bus_no, value)
             else:
                 raise Exception("got %s expected (supply, demand)" % line[0])
+
+        # ignore results 
+        elif line[0] == "result":
+            continue
                 
         # nothing else allowed
         else:
@@ -828,6 +856,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 # EOF -------------------------------------------------------------------------

@@ -126,6 +126,18 @@ class PSAT(object):
         self.demand = []
         self.supply = []
 
+#     def deepcopy(self, other): # depreciated: use copy.deepcopy()
+#         """ might not deal with the classes like 'Bus' properly
+#         """
+#         self.busses = other.busses[:]
+#         self.lines = other.lines[:]
+#         self.slack = other.slack[:]
+#         self.generators = other.generators[:]
+#         self.loads = other.loads[:]
+#         self.shunts = other.shunts[:]
+#         self.demand = other.demand[:]
+#         self.supply = other.supply[:]
+        
     def write(self, stream):
         write_section(stream, self.busses, "Bus")
         write_section(stream, self.lines, "Line")
@@ -644,6 +656,12 @@ def read_contingency(stream):
         cont = Contingency()
         cont.title = title 
         cont.options = options
+
+        if "opf" in options:
+            cont.simtype = "optimalpowerflow"
+        else:
+            cont.simtype = "powerflow"
+
         cont.kill = {'bus':[], 'generator':[], 'line':[]}
         cont.supply = {}
         cont.demand = {}

@@ -16,11 +16,10 @@ OPF.basepg = 0;            % ignore base power (as it will be done by bids/offer
 OPF.basepl = 0;            % ignore load power (as it will be done by bids/offers)
 
 % load file
-runpsat('rts','data');
+runpsat('psatfilename','data');
 
 % power flow and save report
 runpsat pf;
-runpsat pfrep;
 
 % optimal power flow and save report
 runpsat opf;

@@ -1,0 +1,48 @@
+[abc] pf
+    remove bus 1
+[abc] pf
+    remove bus 2
+[abc] pf
+    remove bus 3
+[abc] pf
+    remove bus 4
+[abc] pf
+    remove bus 5
+[abc] pf
+    remove bus 6
+[abc] pf
+    remove bus 7
+[abc] pf
+    remove bus 8
+[abc] pf
+    remove bus 9
+[abc] pf
+    remove bus 10
+[abc] pf
+    remove bus 11
+[abc] pf
+    remove bus 12
+[abc] pf
+    remove bus 13
+[abc] pf
+    remove bus 14
+[abc] pf
+    remove bus 15
+[abc] pf
+    remove bus 16
+[abc] pf
+    remove bus 17
+[abc] pf
+    remove bus 18
+[abc] pf
+    remove bus 19
+[abc] pf
+    remove bus 20
+[abc] pf
+    remove bus 21
+[abc] pf
+    remove bus 22
+[abc] pf
+    remove bus 23
+[abc] pf
+    remove bus 24

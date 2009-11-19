@@ -111,9 +111,11 @@ def main2(psat_file, batch_file, outfile):
 
         matlab_file = open("solve_" + scenario.title + ".m","w")
         make_matlab_script(matlab_file, scenario.title, scenario.simtype)
+        matlab_file.close()
 
         scenario_file = open("psat_" + scenario.title + ".m","w")
         write_scenario(scenario_file, scenario, network)
+        scenario_file.close()
 
         simulate(scenario.title)
 

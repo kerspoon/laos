@@ -1,3 +1,4 @@
 *.pyc
 fm_call.m
 rts_*.txt
+ignore/*

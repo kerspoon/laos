@@ -37,8 +37,9 @@ import time
 import copy 
 import subprocess
 from os.path import basename, splitext
-from psat import read_psat, read_contingency
 from parselog import SimInLimits
+from psat import write_scenario, SimulationBatch, NetworkData
+from misc import *
  
 #------------------------------------------------------------------------------
 # Logging:
@@ -50,29 +51,6 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 
 #------------------------------------------------------------------------------
-# Grem: regexp file deleter
-#------------------------------------------------------------------------------
-
-def grem(path, pattern, test=False):
-    pattern = re.compile(pattern)
-    for each in os.listdir(path):
-        if pattern.search(each):
-            name = os.path.join(path, each)
-            try:
-                if not test: os.remove(name)
-                logger.info("Grem removed " + name)
-            except:
-                if not test: 
-                    grem(name, '')
-                    os.rmdir(name)
-                logger.info("Grem removed dir " + name)
-
-def test_grem():
-    grem(".", ".*\.pyc", True)
-    grem(".", "rts_[1234567890]{2}\.txt", True)
-# test_grem()        
-        
-#------------------------------------------------------------------------------
 # 
 #------------------------------------------------------------------------------
 
@@ -80,33 +58,17 @@ def remove_files(title):
     grem(".", title + "_[1234567890]{2}\.txt")
     grem(".", "solve_" + title + "\.m")
     grem(".", "psat_" + title + "\.m")
-    
-def make_matlab_script(title, simtype):
 
-    if simtype == "powerflow":
+def make_matlab_script(stream, title, simtype):
+
+    if simtype == "pf":
         base_file = "pf_solve.m"
-    elif simtype == "optimalpowerflow":
+    elif simtype == "opf":
         base_file = "opf_solve.m"
 
     new_text = open(base_file).read().replace('psatfilename', "psat_" + title)
-    open("solve_" + title + ".m","w").write(new_text)
+    stream.write(new_text)
     #todo: do i need to close these files? 
-
-def write_contingency(contingency, psat):
-
-    newpsat = copy.deepcopy(psat)
-
-    for kill in contingency.kill["bus"]:
-        newpsat.remove_bus(kill)
-    for kill in contingency.kill["line"]:
-        newpsat.remove_line(kill[0], kill[1])
-    for kill in contingency.kill["generator"]:
-        newpsat.remove_generator(kill)
-
-    if not(len(contingency.supply) == 0 and len(contingency.demand) == 0):
-        raise Exception("not implemented")
-    
-    newpsat.write(open("psat_" + contingency.title + ".m","w"))
 
 def simulate(title):
     proc = subprocess.Popen('matlab -nodesktop -nodisplay -nojvm -nosplash -r solve_' + title,
@@ -131,21 +93,29 @@ def parselog(title, simtype):
  
 def main2(psat_file, batch_file, outfile):
 
-    psat = read_psat(psat_file)
-    contingencies = read_contingency(batch_file)
+    network = NetworkData()
+    network.read(psat_file)
 
-    for contingency in contingencies:
-        remove_files(contingency.title)
-        make_matlab_script(contingency.title, contingency.simtype)
-        write_contingency(contingency, psat)
-        simulate(contingency.title)
-        contingency.result = parselog(contingency.title, contingency.simtype)
-        print contingency.result
+    batch = SimulationBatch()
+    batch.read(batch_file)
 
-    for contingency in contingencies:
-        contingency.write(outfile)
-    
- 
+    for scenario in batch:
+
+        remove_files(scenario.title)
+
+        matlab_file = open("solve_" + title + ".m","w")
+        make_matlab_script(scenario.title, scenario.simtype)
+
+        scenario_file = open("psat_" + title + ".m","w")
+        write_scenario(scenario_file, scenario, psat)
+
+        simulate(scenario.title)
+
+        scenario.result = parselog(scenario.title, scenario.simtype)
+
+        print "RESULT:", scenario.result
+        scenario.write(outfile)
+
 #------------------------------------------------------------------------------
 # "main" function:
 #------------------------------------------------------------------------------

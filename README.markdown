@@ -41,3 +41,25 @@ To Try
  - OPF.report % not sure but should be checked out
  - clpsat.refresh = 0 % don't bother re-running the PF
  - clpsat.showopf % not sure
+
+Classes
+=======
+
+    NetworkData
+      Bus
+      Line
+      Slack
+      Generator
+      Load
+      Shunt 
+      Demand 
+      Supply
+    
+    NetworkProbability
+      Bus
+      Generator
+      Line
+      Crow
+    
+    SimulationBatch
+      Scenario

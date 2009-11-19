@@ -17,22 +17,14 @@
 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 #------------------------------------------------------------------------------
 
-""" Defines a class for reading PSAT data files.
-    based almost entirely on pylon by Richard W. Lincoln
-    overload the PSATReader push functions to use.
-"""
 
 #------------------------------------------------------------------------------
 #  Imports:
 #------------------------------------------------------------------------------
 
 import sys 
-import optparse
-import time
 import logging
-from os.path import basename, splitext
-from parsing_util import integer, boolean, real, scolon, matlab_comment
-from pyparsing import Optional, Literal, ZeroOrMore
+from copy import deepcopy
 
 #------------------------------------------------------------------------------
 #  Logging:
@@ -44,72 +36,148 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 
 #------------------------------------------------------------------------------
-#  as_csv :: [T], str -> str
+#  NetworkProbability:
 #------------------------------------------------------------------------------
-def as_csv(iterable,sep = "  "):
-    """a string of each item seperated by commas"""
-    iterable = list(iterable)
-    res = ""
-    if len(iterable) == 0:
-        return ""
-    for item in iterable[:-1]:
-        res += str(item) + sep
-    return res + str(iterable[len(iterable)-1])
 
+class NetworkProbability(object):
+    """
+       A Data file containing the probability of failure of various components
+       as well as joint failure of different components.
+
+       e.g. 
+           bus , 101 , 0.025 , 13 
+           bus , 102 , 0.025 , 13 
+           bus , 103 , 0.025 , 13 
+           line , A7    , 103 , 124 , .02 ,   768 ,  0.0
+           line , A8    , 104 , 109 , .36 ,    10 ,  1.4
+           gen , G47 , 213 , 950  ,  50  ,   U197         
+           gen , G48 , 214 , -1   ,  -1  , Sync Cond      
+           crow , C25-2 , C25-1 , 0.075
+           crow , C30   , C34   , 0.075
+           crow , C34   , C30   , 0.075
+    """
+
+    class Bus(struct):
+        entries = "bus_id fail_rate repair_rate".split()
+        types = "int real real".split()
+            
+    class Generator(struct):
+        entries = "name fbus tbus fail_rate repair_rate trans_fail".split()
+        types = "str int int real real real".split()
+
+    class Line(struct):
+        entries = "name bus_id mttf mttr gen_type".split()
+        types = "str int int int str".split()
+
+    class Crow(struct):
+        entries = "bus1 bus2 probability".split()
+        types = "int int real".split()
+
+    def __init__(self):
+        self.busses = []
+        self.lines = []
+        self.generators = []
+        self.crows = []
+
+    def read(self, stream):
+        for line in stream:
+            cols = [x.lower() for x in line.split()]
+            
+            if len(cols) == 0 or cols[0].startswith("#"):
+                continue
+            elif cols[0] == "bus":
+                self.busses.append(read_struct(Bus, cols[1:]))
+            elif cols[0] == "line":
+                self.lines.append(read_struct(Line, cols[1:]))
+            elif cols[0] == "generator":
+                self.generators.append(read_struct(Generator, cols[1:]))
+            elif cols[0] == "crow":
+                self.crows.append(read_struct(Crow, cols[1:]))
+            else:
+                raise Exception("expected (bus, line, generator, crow) got " + cols[0])
+
+    def write(self, stream):
+        stream.write("# NetworkProbability data file\n")
+
+        stream.write("# bus " + as_csv(Bus.entries," ") + "\n")
+        for bus in self.busses:
+            stream.write("bus " + str(bus) + "\n")
+            
+        stream.write("# line " + as_csv(Line.entries," ") + "\n")
+        for line in self.lines:
+            stream.write("line " + str(line) + "\n")
+
+        stream.write("# generator " + as_csv(Generator.entries," ") + "\n")
+        for generator in self.generators:
+            stream.write("generator " + str(generator) + "\n")
+
+        stream.write("# crow " + as_csv(Crow.entries," ") + "\n")
+        for crow in self.crows:
+            stream.write("crow " + str(crow) + "\n")
+        
 #------------------------------------------------------------------------------
-#  PSAT classes:
+#  NetworkData:
 #------------------------------------------------------------------------------
 
 def write_section(stream, items, title):
+    """write one section of a Matlab file"""
     stream.write(title + ".con = [ ... \n")
     for item in items:
         stream.write("  " + str(item) + "\n")
     stream.write(" ];\n")
 
-class PSAT(object):
+def read_section(stream, items, classtype):
+    """read one section of Matlab file, assuming the header is done.
+       and assuming that each line is one row ended by a semicolon. 
+    """
 
-    class basic(object):
-        def __init__(self, tokens=None):
-            if tokens:
-                self.dictfill(tokens)
-                self.check()
+    for line in stream:
+        line = line.strip()
 
-        def __str__(self):
-            return as_csv(self.__dict__[x] for x in self.entries)
+        if re.matches(line,"\A\] *;\Z"): # if line == "];"
+            break
 
-        def dictfill(self, kwds):
-            self.__dict__.update(kwds)
+        if len(line) == 0 or line.startswith("#"):
+            continue
 
-        def check(self):
-            for item in self.entries:
-                assert item in self.__dict__
+        cols = [x.lower() for x in line.replace(";"," ").split()]
+        items.append(read_struct(classtype, cols))
 
-    class Bus(basic):
-        entries = "bus_no v_base v_magnitude_guess v_angle_guess area region".split()
-                   
-    class Line(basic):
-        entries = "fbus tbus s_rating v_rating f_rating length v_ratio r x b tap shift i_limit p_limit s_limit status".split()
+class NetworkData(object):
+    """matlab psat data file"""
+
+    class Bus(struct):
+        entries = "bus_no v_base v_magnitude_guess \
+                   v_angle_guess area region".split()
+
+    class Line(struct):
+        entries = "fbus tbus s_rating v_rating f_rating length v_ratio \
+                   r x b tap shift i_limit p_limit s_limit status".split()
             
-    class Slack(basic):
-        entries = "bus_no s_rating v_rating v_magnitude ref_angle q_max q_min v_max v_min p_guess lp_coeff ref_bus status".split()
+    class Slack(struct):
+        entries = "bus_no s_rating v_rating v_magnitude ref_angle \
+                   q_max q_min v_max v_min p_guess lp_coeff \
+                   ref_bus status".split()
 
-    class Generator(basic):
-        entries = "bus_no s_rating v_rating p v q_max q_min v_max v_min lp_coeff status".split()
+    class Generator(struct):
+        entries = "bus_no s_rating v_rating p v q_max q_min \
+                   v_max v_min lp_coeff status".split()
 
-    class Load(basic):
-        entries = "bus_no s_rating v_rating p q v_max v_min z_conv status".split()
+    class Load(struct):
+        entries = "bus_no s_rating v_rating p q v_max v_min \
+                   z_conv status".split()
 
-    class Shunt(basic):
+    class Shunt(struct):
         entries = "bus_no s_rating v_rating f_rating g b status".split()
 
-    class Demand(basic):
+    class Demand(struct):
         entries = "bus_no s_rating p_direction q_direction \
             p_bid_max p_bid_min p_optimal_bid p_fixed \
             p_proportional p_quadratic q_fixed q_proportional \
             q_quadratic commitment cost_tie_break cost_cong_up \
             cost_cong_down status".split()
 
-    class Supply(basic):
+    class Supply(struct):
         entries = "bus_no s_rating p_direction p_bid_max \
             p_bid_min p_bid_actual p_fixed p_proportional \
             p_quadratic q_fixed q_proportional q_quadratic \
@@ -126,18 +194,45 @@ class PSAT(object):
         self.demand = []
         self.supply = []
 
-#     def deepcopy(self, other): # depreciated: use copy.deepcopy()
-#         """ might not deal with the classes like 'Bus' properly
-#         """
-#         self.busses = other.busses[:]
-#         self.lines = other.lines[:]
-#         self.slack = other.slack[:]
-#         self.generators = other.generators[:]
-#         self.loads = other.loads[:]
-#         self.shunts = other.shunts[:]
-#         self.demand = other.demand[:]
-#         self.supply = other.supply[:]
-        
+    def read(self, stream):
+        """might be easier to use the working one!"""
+
+        def title_matches(line, title):
+            #todo: replace with regexp
+            return line.startswith(title):
+
+        for line in stream:
+            line = line.strip()
+
+            if len(line) == 0 or line.startswith("#"):
+                continue
+            elif title_matches(line, "Bus.con"):
+                read_section(stream, self.busses, Bus)
+                assert len(self.busses) >= 1
+            elif title_matches(line, "Line.con"):
+                read_section(stream, self.lines, Line)
+                assert len(self.lines) >= 1
+            elif title_matches(line, "SW.con"):
+                read_section(stream, self.slack, Slack)
+                assert len(self.slack) == 1
+            elif title_matches(line, "PV.con"):
+                read_section(stream, self.generators, Generator)
+                assert len(self.generators) >= 0
+            elif title_matches(line, "PQ.con"):
+                read_section(stream, self.loads, Load)
+                assert len(self.loads) >= 1
+            elif title_matches(line, "Shunt.con"):
+                read_section(stream, self.shunts, Shunt)
+                assert len(self.shunts) >= 0
+            elif title_matches(line, "Demand.con"):
+                read_section(stream, self.demand, Demand)
+                assert len(self.demand) >= 0 
+            elif title_matches(line, "Supply.con"):
+                read_section(stream, self.supply, Supply)
+                assert len(self.Supply) >= 0
+            else:
+                raise Exception("expected matlab section, got " + line)
+            
     def write(self, stream):
         write_section(stream, self.busses, "Bus")
         write_section(stream, self.lines, "Line")
@@ -166,7 +261,7 @@ class PSAT(object):
 
         # kill all connecting items
         self.lines = filter(lambda x: x.fbus != thebus and x.tbus != thebus, self.lines)
-
+        
         self.slack = filter(lambda x: x.bus_no != thebus, self.slack) 
         if len(self.slack) == 0:
             logger.info("todo: deal with deleting slack bus")
@@ -184,7 +279,7 @@ class PSAT(object):
 
         # list all matches
         matches = [x for x in self.lines if test(x)]
-            
+
         # remove it 
         self.remove_item(matches, self.lines, line_no)
             
@@ -221,640 +316,157 @@ class PSAT(object):
         else:
             raise Exception("can't happen")
 
-
 #------------------------------------------------------------------------------
-#  "PSATReader" class:
+#  SimulationBatch:
 #------------------------------------------------------------------------------
 
-class PSATReader(object):
-    """ Defines a method class for reading PSAT data files
+class Scenario(object):
+    def __init__(self, title):
+        self.title = title
+        self.simtype = "pf"
+        self.kill = {'bus':[], 'generator':[], 'line':[]}
+        self.supply = {}
+        self.demand = {}
+        self.result = None
+
+    def write(self, stream):
+
+        stream.write("[" + self.title + "] " + self.simtype)
+        for kill in self.kill["bus"]:
+            stream.write("  remove bus " + str(kill) + "\n")
+        for kill in self.kill["line"]:
+            stream.write("  remove line " + as_csv(kill, " ") + "\n")
+        for kill in self.kill["generator"]:
+            stream.write("  remove generator " + str(kill) + "\n")
+        for item in self.supply.items():
+            stream.write("  set supply " + as_csv(item, " ") + "\n")
+        for item in self.demand.items():
+            stream.write("  set demand " + as_csv(item, " ") + "\n")
+        
+        if self.result != None: # damn python's multiple true values
+            if self.result == True:
+                stream.write("  result pass\n")
+            else:
+                stream.write("  result fail\n")
+
+class SimulationBatch(object):
+    """
+       e.g. 
+           [abc]
+               remove bus 1
+               remove bus 1 
+               remove line 1 3
+               remove generator 4
+               set demand 1 1.27
+           [def]
+               set supply 58 0.41
+           [ghi]
+           [jkl]
+               remove generator 2 
     """
 
     def __init__(self):
-        """ Initialises a new PSATReader instance.
-        """
-        # Path to the data file or file object.
-        self.file_or_filename = None
-        self.psat = PSAT()
+        self.scenarios = []
 
-    def __call__(self, file_or_filename):
-        """ Calls the reader with the given file or file name.
-        """
-        self.read(file_or_filename)
+    def write(self, stream):
+        for scenario in self.scenarios:
+            scenario.write(stream)
 
-    #--------------------------------------------------------------------------
-    #  Parse a PSAT data file and return a case object
-    #--------------------------------------------------------------------------
+    def read(self, stream):
 
-    def read(self, file_or_filename):
-        """ Parses a PSAT data file and returns a case object
-
-            file: File object or path to data file with PSAT format data
-            return: Case object
-        """
-        self.file_or_filename = file_or_filename
-
-        logger.info("Parsing PSAT case file [%s]." % file_or_filename)
-
-        t0 = time.time()
-
-        # Name the case
-        if isinstance(file_or_filename, basestring):
-            name, ext = splitext(basename(file_or_filename))
-        else:
-            name, ext = splitext(file_or_filename.name)
-
-        bus_array = self._get_bus_array_construct()
-        line_array = self._get_line_array_construct()
-        # TODO: Lines.con - Alternative line data format
-        slack_array = self._get_slack_array_construct()
-        pv_array = self._get_pv_array_construct()
-        pq_array = self._get_pq_array_construct()
-        shunt_array = self._get_shunt_array_construct()
-        demand_array = self._get_demand_array_construct()
-        supply_array = self._get_supply_array_construct()
-        # TODO: Varname.bus (Bus names)
-
-        # Pyparsing case:
-        case = \
-            ZeroOrMore(matlab_comment) + bus_array + \
-            ZeroOrMore(matlab_comment) + line_array + \
-            ZeroOrMore(matlab_comment) + slack_array + \
-            ZeroOrMore(matlab_comment) + pv_array + \
-            ZeroOrMore(matlab_comment) + pq_array + \
-            ZeroOrMore(matlab_comment) + shunt_array + \
-            ZeroOrMore(matlab_comment) + demand_array + \
-            ZeroOrMore(matlab_comment) + supply_array
-
-        data = case.parseFile(file_or_filename)
-
-        elapsed = time.time() - t0
-        logger.info("PSAT case file parsed in %.3fs." % elapsed)
-
-        return data
-
-    #--------------------------------------------------------------------------
-    #  Construct getters:
-    #--------------------------------------------------------------------------
-
-    def _get_bus_array_construct(self):
-        """ Returns a construct for an array of bus data.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        v_base = real.setResultsName("v_base") # kV
-        v_magnitude_guess = Optional(real).setResultsName("v_magnitude_guess")
-        v_angle_guess = Optional(real).setResultsName("v_angle_guess") # radians
-        area = Optional(integer).setResultsName("area") # not used yet
-        region = Optional(integer).setResultsName("region") # not used yet
-
-        bus_data = bus_no + v_base + v_magnitude_guess + v_angle_guess + \
-            area + region + scolon
-
-        bus_data.setParseAction(self.push_bus)
-
-        bus_array = Literal("Bus.con") + "=" + "[" + "..." + \
-            ZeroOrMore(bus_data + Optional("]" + scolon))
-
-        # Sort buses according to their name (bus_no)
-        bus_array.setParseAction(self.sort_buses)
-
-        return bus_array
-
-
-    def _get_line_array_construct(self):
-        """ Returns a construct for an array of line data.
-        """
-        source_bus = integer.setResultsName("fbus")
-        target_bus = integer.setResultsName("tbus")
-        s_rating = real.setResultsName("s_rating") # MVA
-        v_rating = real.setResultsName("v_rating") # kV
-        f_rating = real.setResultsName("f_rating") # Hz
-        length = real.setResultsName("length") # km (Line only)
-        v_ratio = real.setResultsName("v_ratio") # kV/kV (Transformer only)
-        r = real.setResultsName("r") # p.u. or Ohms/km
-        x = real.setResultsName("x") # p.u. or Henrys/km
-        b = real.setResultsName("b") # p.u. or Farads/km (Line only)
-        tap_ratio = real.setResultsName("tap") # p.u./p.u. (Transformer only)
-        phase_shift = real.setResultsName("shift") # degrees (Transformer only)
-        i_limit = Optional(real).setResultsName("i_limit") # p.u.
-        p_limit = Optional(real).setResultsName("p_limit") # p.u.
-        s_limit = Optional(real).setResultsName("s_limit") # p.u.
-        status = Optional(integer).setResultsName("status")
-
-        line_data = source_bus + target_bus + s_rating + v_rating + \
-            f_rating + length + v_ratio + r + x + b + tap_ratio + \
-            phase_shift + i_limit + p_limit + s_limit + status + scolon
-
-        line_data.setParseAction(self.push_line)
-
-        line_array = Literal("Line.con") + "=" + "[" + "..." + \
-            ZeroOrMore(line_data + Optional("]" + scolon))
-
-        return line_array
-
-
-    def _get_slack_array_construct(self):
-        """ Returns a construct for an array of slack bus data.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        v_rating = real.setResultsName("v_rating") # kV
-        v_magnitude = real.setResultsName("v_magnitude") # p.u.
-        ref_angle = real.setResultsName("ref_angle") # p.u.
-        q_max = Optional(real).setResultsName("q_max") # p.u.
-        q_min = Optional(real).setResultsName("q_min") # p.u.
-        v_max = Optional(real).setResultsName("v_max") # p.u.
-        v_min = Optional(real).setResultsName("v_min") # p.u.
-        p_guess = Optional(real).setResultsName("p_guess") # p.u.
-         # Loss participation coefficient
-        lp_coeff = Optional(real).setResultsName("lp_coeff")
-        ref_bus = Optional(integer).setResultsName("ref_bus")
-        status = Optional(integer).setResultsName("status")
-
-        slack_data = bus_no + s_rating + v_rating + v_magnitude + \
-            ref_angle + q_max + q_min + v_max + v_min + p_guess + \
-            lp_coeff + ref_bus + status + scolon
-
-        slack_data.setParseAction(self.push_slack)
-
-        slack_array = Literal("SW.con") + "=" + "[" + "..." + \
-            ZeroOrMore(slack_data + Optional("]" + scolon))
-
-        return slack_array
-
-    def _get_shunt_array_construct(self):
-        """ Returns a construct for an array of shunts.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        v_rating = real.setResultsName("v_rating") # kV
-        f_rating = real.setResultsName("f_rating") # Hz
-        g = real.setResultsName("g") # p.u.
-        b = real.setResultsName("b") # p.u.
-        status = Optional(integer).setResultsName("status")
+        def add_kill(component, name):
+            # add the kill to the current contingency
+            self.scenarios[-1].kill[component].append(name)
+            logger.debug("Kill: %s[%s]" % (component, name))
         
-        shunt_data = bus_no +  s_rating + v_rating + f_rating + \
-            g + b + status + scolon
+        def set_supply(bus_no, value):
+            self.scenarios[-1].supply[bus_no] = value
+            logger.debug("Set supply: bus[%s]=%f" % (bus_no, value))
+        
+        def set_demand(bus_no, value):
+            self.scenarios[-1].demand[bus_no] = value
+            logger.debug("Set demand: bus[%s]=%f" % (bus_no, value))
 
-        shunt_data.setParseAction(self.push_shunt)
+        for line in stream:
 
-        shunt_array = Literal("Shunt.con") + "=" + "[" + "..." + \
-            ZeroOrMore(shunt_data + Optional("]" + scolon))
+            line = [x.lower() for x in line.split()]
+        
+            # comments
+            if len(line) == 0 or line[0].startswith("#"):
+                continue
 
-        return shunt_array
-         
-    def _get_pv_array_construct(self):
-        """ Returns a construct for an array of PV generator data.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        v_rating = real.setResultsName("v_rating") # kV
-        p = real.setResultsName("p") # p.u.
-        v = real.setResultsName("v") # p.u.
-        q_max = Optional(real).setResultsName("q_max") # p.u.
-        q_min = Optional(real).setResultsName("q_min") # p.u.
-        v_max = Optional(real).setResultsName("v_max") # p.u.
-        v_min = Optional(real).setResultsName("v_min") # p.u.
-         # Loss participation coefficient
-        lp_coeff = Optional(real).setResultsName("lp_coeff")
-        status = Optional(integer).setResultsName("status")
+            # title
+            elif line[0].startswith("["):
+                title = line[0][1:-1]
+                logger.debug("Added Scenario: %s" % title)
+                self.scenarios.append(Scenario())
 
-        pv_data = bus_no + s_rating + v_rating + p + v + q_max + \
-            q_min + v_max + v_min + lp_coeff + status + scolon
-
-        pv_data.setParseAction(self.push_pv)
-
-        pv_array = Literal("PV.con") + "=" + "[" + "..." + \
-            ZeroOrMore(pv_data + Optional("]" + scolon))
-
-        return pv_array
-
-
-    def _get_pq_array_construct(self):
-        """ Returns a construct for an array of PQ load data.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        v_rating = real.setResultsName("v_rating") # kV
-        p = real.setResultsName("p") # p.u.
-        q = real.setResultsName("q") # p.u.
-        v_max = Optional(real).setResultsName("v_max") # p.u.
-        v_min = Optional(real).setResultsName("v_min") # p.u.
-        # Allow conversion to impedance
-        z_conv = Optional(integer).setResultsName("z_conv")
-        status = Optional(integer).setResultsName("status")
-
-        pq_data = bus_no + s_rating + v_rating + p + q + v_max + \
-            v_min + z_conv + status + scolon
-
-        pq_data.setParseAction(self.push_pq)
-
-        pq_array = Literal("PQ.con") + "=" + "[" + "..." + \
-            ZeroOrMore(pq_data + Optional("]" + scolon))
-
-        return pq_array
-
-
-    def _get_demand_array_construct(self):
-        """ Returns a construct for an array of power demand data.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        p_direction = real.setResultsName("p_direction") # p.u.
-        q_direction = real.setResultsName("q_direction") # p.u.
-        p_bid_max = real.setResultsName("p_bid_max") # p.u.
-        p_bid_min = real.setResultsName("p_bid_min") # p.u.
-        p_optimal_bid = Optional(real).setResultsName("p_optimal_bid")
-        p_fixed = real.setResultsName("p_fixed") # $/hr
-        p_proportional = real.setResultsName("p_proportional") # $/MWh
-        p_quadratic = real.setResultsName("p_quadratic") # $/MW^2h
-        q_fixed = real.setResultsName("q_fixed") # $/hr
-        q_proportional = real.setResultsName("q_proportional") # $/MVArh
-        q_quadratic = real.setResultsName("q_quadratic") # $/MVAr^2h
-        commitment = integer.setResultsName("commitment")
-        cost_tie_break = real.setResultsName("cost_tie_break") # $/MWh
-        cost_cong_up = real.setResultsName("cost_cong_up") # $/h
-        cost_cong_down = real.setResultsName("cost_cong_down") # $/h
-        status = Optional(integer).setResultsName("status")
-
-        demand_data = bus_no + s_rating + p_direction + q_direction + \
-            p_bid_max + p_bid_min + p_optimal_bid + p_fixed + \
-            p_proportional + p_quadratic + q_fixed + q_proportional + \
-            q_quadratic + commitment + cost_tie_break + cost_cong_up + \
-            cost_cong_down + status + scolon
-
-        demand_data.setParseAction(self.push_demand)
-
-        demand_array = Literal("Demand.con") + "=" + "[" + "..." + \
-            ZeroOrMore(demand_data + Optional("]" + scolon))
-
-        return demand_array
-
-
-    def _get_supply_array_construct(self):
-        """ Returns a construct for an array of power supply data.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        p_direction = real.setResultsName("p_direction") # CPF
-        p_bid_max = real.setResultsName("p_bid_max") # p.u.
-        p_bid_min = real.setResultsName("p_bid_min") # p.u.
-        p_bid_actual = real.setResultsName("p_bid_actual") # p.u.
-        p_fixed = real.setResultsName("p_fixed") # $/hr
-        p_proportional = real.setResultsName("p_proportional") # $/MWh
-        p_quadratic = real.setResultsName("p_quadratic") # $/MW^2h
-        q_fixed = real.setResultsName("q_fixed") # $/hr
-        q_proportional = real.setResultsName("q_proportional") # $/MVArh
-        q_quadratic = real.setResultsName("q_quadratic") # $/MVAr^2h
-        commitment = integer.setResultsName("commitment")
-        cost_tie_break = real.setResultsName("cost_tie_break") # $/MWh
-        lp_factor = real.setResultsName("lp_factor")# Loss participation factor
-        q_max = real.setResultsName("q_max") # p.u.
-        q_min = real.setResultsName("q_min") # p.u.
-        cost_cong_up = real.setResultsName("cost_cong_up") # $/h
-        cost_cong_down = real.setResultsName("cost_cong_down") # $/h
-        status = Optional(integer).setResultsName("status")
-
-        supply_data = bus_no + s_rating + p_direction + p_bid_max + \
-            p_bid_min + p_bid_actual + p_fixed + p_proportional + \
-            p_quadratic + q_fixed + q_proportional + q_quadratic + \
-            commitment + cost_tie_break + lp_factor + q_max + q_min + \
-            cost_cong_up + cost_cong_down + status + scolon
-
-        supply_data.setParseAction(self.push_supply)
-
-        supply_array = Literal("Supply.con") + "=" + "[" + "..." + \
-            ZeroOrMore(supply_data + Optional("]" + scolon))
-
-        return supply_array
-
-
-    def _get_generator_ramping_construct(self):
-        """ Returns a construct for an array of generator ramping data.
-        """
-        supply_no = integer.setResultsName("supply_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        up_rate = real.setResultsName("up_rate") # p.u./h
-        down_rate = real.setResultsName("down_rate") # p.u./h
-        min_period_up = real.setResultsName("min_period_up") # h
-        min_period_down = real.setResultsName("min_period_down") # h
-        initial_period_up = integer.setResultsName("initial_period_up")
-        initial_period_down = integer.setResultsName("initial_period_down")
-        c_startup = real.setResultsName("c_startup") # $
-        status = integer.setResultsName("status")
-
-        g_ramp_data = supply_no + s_rating + up_rate + down_rate + \
-            min_period_up + min_period_down + initial_period_up + \
-            initial_period_down + c_startup + status + scolon
-
-        g_ramp_array = Literal("Rmpg.con") + "=" + "[" + \
-            ZeroOrMore(g_ramp_data + Optional("]" + scolon))
-
-        return g_ramp_array
-
-
-    def _get_load_ramping_construct(self):
-        """ Returns a construct for an array of load ramping data.
-        """
-        bus_no = integer.setResultsName("bus_no")
-        s_rating = real.setResultsName("s_rating") # MVA
-        up_rate = real.setResultsName("up_rate") # p.u./h
-        down_rate = real.setResultsName("down_rate") # p.u./h
-        min_up_time = real.setResultsName("min_up_time") # min
-        min_down_time = real.setResultsName("min_down_time") # min
-        n_period_up = integer.setResultsName("n_period_up")
-        n_period_down = integer.setResultsName("n_period_down")
-        status = integer.setResultsName("status")
-
-        l_ramp_data = bus_no + s_rating + up_rate + down_rate + \
-            min_up_time + min_down_time + n_period_up + \
-            n_period_down + status + scolon
-
-        l_ramp_array = Literal("Rmpl.con") + "=" + "[" + \
-            ZeroOrMore(l_ramp_data + Optional("]" + scolon))
-
-        return l_ramp_array
-
-    #--------------------------------------------------------------------------
-    #  Parse actions:
-    #--------------------------------------------------------------------------
-
-    def push_bus(self, tokens):
-        """ Adds a Bus object to the case.
-        """
-        logger.debug("Pushing bus data: %s" % tokens)
-        self.psat.busses.append(PSAT.Bus(tokens))
-
-    def sort_buses(self, tokens):
-        """ Sorts bus list according to name (bus_no).
-        """
-        logger.debug("Sorting busses: %s" % tokens)
-        #TODO: might need to do something smart with the names!
-
-    def push_line(self, tokens):
-        """ Adds a Branch object to the case.
-        """
-        logger.debug("Pushing line data: %s" % tokens)
-        self.psat.lines.append(PSAT.Line(tokens))
-
-    def push_shunt(self, tokens):
-        """ Adds a Shunt object to the case.
-        """
-        logger.debug("Pushing shunt data: %s" % tokens)
-        self.psat.shunts.append(PSAT.Shunt(tokens))
-
-    def push_slack(self, tokens):
-        """ Finds the slack bus, adds a Generator with the appropriate data
-            and sets the bus type to slack.
-        """
-        logger.debug("Pushing slack data: %s" % tokens)
-        self.psat.slack.append(PSAT.Slack(tokens))
-
-    def push_pv(self, tokens):
-        """ Creates and Generator object, populates it with data,
-            finds its Bus and adds it.
-        """
-        logger.debug("Pushing PV data: %s" % tokens)
-        self.psat.generators.append(PSAT.Generator(tokens))
-
-    def push_pq(self, tokens):
-        """ Creates and Load object, populates it with data,
-            finds its Bus and adds it.
-        """
-        logger.debug("Pushing PQ data: %s" % tokens)
-        self.psat.loads.append(PSAT.Load(tokens))
-
-    def push_demand(self, tokens):
-        """ Added OPF and CPF data to an appropriate Load.
-        """
-        logger.debug("Pushing demand data: %s" % tokens)
-        self.psat.demand.append(PSAT.Demand(tokens))
-
-    def push_supply(self, tokens):
-        """ Adds OPF and CPF data to a Generator.
-        """
-        logger.debug("Pushing supply data: %s" % tokens)
-        self.psat.supply.append(PSAT.Supply(tokens))
-
-def read_psat(stream):
-    psatreader = PSATReader()
-    psatreader(stream)
-    return psatreader.psat
+            # remove 
+            elif line[0] == "remove":
+                if line[1] == "bus":
+                    bus_no = int(line[2])
+                    add_kill("bus",bus_no)
+                elif line[1] == "line":
+                    fbus = int(line[2])
+                    tbus = int(line[3])
+                    add_kill("line", (fbus, tbus))
+                elif line[1] == "generator":
+                    bus_no = int(line[2])
+                    add_kill("generator",bus_no)
+                else:
+                    raise Exception("got %s expected (line, generator, bus)" % line[1])
+            
+            # set
+            elif line[0] == "set":
+                if line[1] == "supply":
+                    bus_no = int(line[2])
+                    value = float(line[3])
+                    set_supply(bus_no, value)
+                elif line[1] == "demand":
+                    bus_no = int(line[2])
+                    value = float(line[3])
+                    set_demand(bus_no, value)
+                else:
+                    raise Exception("got %s expected (supply, demand)" % line[1])
+           
+            # ignore results 
+            elif line[0] == "result":
+                if line[1] == "pass":
+                    self.scenarios[-1].result = True
+                    logger.debug("result pass")
+                elif line[1] == "fail":
+                    self.scenarios[-1].result = False
+                    logger.debug("result fail")
+                else:
+                    raise Exception("got %s expected (pass, fail)" % line[1])
+                    
+                    
+            # nothing else allowed
+            else:
+                raise Exception("got %s expected (remove, set, result, [...], #)" % line[0])
 
 #------------------------------------------------------------------------------
 #  
 #------------------------------------------------------------------------------
 
-def read_contingency(stream):
-
-    class Contingency:
-        def write(self,stream):
-            stream.write("[" + self.title + "] ")
-            
-            if "opf" in options:
-                stream.write("opf\n")
-            else:
-                stream.write("pf\n")
-            
-            for kill in self.kill["bus"]:
-                stream.write("  remove bus " + str(kill) + "\n")
-            for kill in self.kill["line"]:
-                stream.write("  remove line " + as_csv(kill, " ") + "\n")
-            for kill in self.kill["generator"]:
-                stream.write("  remove generator " + str(kill) + "\n")
-            for item in self.supply.items():
-                stream.write("  set supply " + as_csv(item, " ") + "\n")
-            for item in self.demand.items():
-                stream.write("  set demand " + as_csv(item, " ") + "\n")
-            
-            if "result" in self.__dict__:
-                if self.result:
-                    stream.write("  result pass\n")
-                else:
-                    stream.write("  result fail\n")
-                
-
-    contingencies = []
-
-    def new_section(title, options):
-        cont = Contingency()
-        cont.title = title 
-        cont.options = options
-
-        if "opf" in options:
-            cont.simtype = "optimalpowerflow"
-        else:
-            cont.simtype = "powerflow"
-
-        cont.kill = {'bus':[], 'generator':[], 'line':[]}
-        cont.supply = {}
-        cont.demand = {}
-        contingencies.append(cont)
-        logger.debug("Added Contingency: %s" % title)
-
-    def add_kill(component, name):
-        # add the kill to the current contingency
-        contingencies[-1].kill[component].append(name)
-        logger.debug("Kill: %s[%s]" % (component, name))
-
-    def set_supply(bus_no, value):
-        contingencies[-1].supply[bus_no] = value
-        logger.debug("Set supply: bus[%s]=%f" % (bus_no, value))
-
-    def set_demand(bus_no, value):
-        contingencies[-1].demand[bus_no] = value
-        logger.debug("Set demand: bus[%s]=%f" % (bus_no, value))
-                
-    for line in stream:
-        line = [x.lower() for x in line.split()]
-        
-        # comments
-        if len(line) == 0 or line[0].startswith("#"):
-            continue
-
-        # title
-        elif line[0].startswith("["):
-            # new title 
-            title = line[0][1:-1]
-            options = set(line[1:])
-            assert options <= set(["pf","opf"])
-            new_section(title, options)
-
-        # remove 
-        elif line[0] == "remove":
-            if line[1] == "bus":
-                bus_no = int(line[2])
-                add_kill("bus",bus_no)
-            elif line[1] == "line":
-                fbus = int(line[2])
-                tbus = int(line[3])
-                add_kill("line", (fbus, tbus))
-            elif line[1] == "generator":
-                bus_no = int(line[2])
-                add_kill("generator",bus_no)
-            else:
-                raise Exception("got %s expected (line, generator, bus)" % line[0])
-                
-        # set
-        elif line[0] == "set":
-            if line[1] == "supply":
-                bus_no = int(line[2])
-                value = float(line[3])
-                set_supply(bus_no, value)
-            elif line[1] == "demand":
-                bus_no = int(line[2])
-                value = float(line[3])
-                set_demand(bus_no, value)
-            else:
-                raise Exception("got %s expected (supply, demand)" % line[0])
-
-        # ignore results 
-        elif line[0] == "result":
-            continue
-                
-        # nothing else allowed
-        else:
-            raise Exception("got %s expected (remove, set, [...], #)" % line[0])
-
-    return contingencies
-
-def test_read_contingency():
-    import StringIO
-    text = StringIO.StringIO("""
-    [abc]
-        remove bus 1
-        remove bus 1 
-        remove line 1 3
-        remove generator 4
-        set demand 1 1.27
-    [def]
-        set supply 58 0.41
-    [ghi]
-    [jkl]
-        remove generator 2 
-    """)
-    print read_contingency(text)
-# test_read_contingency()
-
-#------------------------------------------------------------------------------
-#  "main2" function:
-#------------------------------------------------------------------------------
-
-def main2(infile, outfile):
-    readme = PSATReader()
-    readme(infile)
- 
-    # readme.psat.remove_bus(1)
-    # readme.psat.remove_line(11, 10)
-    readme.psat.remove_generator(21)
-    readme.psat.write(open(outfile,"w"))
-
-#------------------------------------------------------------------------------
-#  "main" function:
-#------------------------------------------------------------------------------
-
-def main():
-    """ Parses the command line and call with the correct data.
+def write_scenario(stream, scenario, network):
+    """write the network to the file with the changes specified in scenario
     """
-    parser = optparse.OptionParser("usage: program [options] input_file")
 
-    parser.add_option("-o", "--output", dest="output", metavar="FILE",
-        help="Write the solution report to FILE.")
+    newpsat = deepcopy(psat)
 
-    parser.add_option("-q", "--quiet", action="store_true", dest="quiet",
-        default=False, help="Print less information.")
+    for kill in contingency.kill["bus"]:
+        newpsat.remove_bus(kill)
+    for kill in contingency.kill["line"]:
+        newpsat.remove_line(kill[0], kill[1])
+    for kill in contingency.kill["generator"]:
+        newpsat.remove_generator(kill)
 
-    parser.add_option("-d", "--debug", action="store_true", dest="debug",
-        default=False, help="Print debug information.")
+    if not(len(contingency.supply) == 0 and len(contingency.demand) == 0):
+        raise Exception("not implemented")
+    
+    newpsat.write(stream)
 
-    (options, args) = parser.parse_args()
 
-    if options.quiet:
-        logger.info("setting logger level to critical")
-        logger.setLevel(logging.CRITICAL)
-    elif options.debug:
-        logger.info("setting logger level to debug")
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.info("setting logger level to info")
-        logger.setLevel(logging.INFO)
 
-    # Output.
-    if options.output:
-        outfile = options.output
-        if outfile == "-":
-            outfile = sys.stdout
-            logger.info("logger level set to critical as output is to stdout")
-            logger.setLevel(logging.CRITICAL) # we must stay quiet
-    else:
-        outfile = sys.stdout
-        logger.info("logger level set to critical as output is to stdout")
-        logger.setLevel(logging.CRITICAL) # we must stay quiet
 
-    # Input.
-    if len(args) > 1:
-        parser.print_help()
-        sys.exit(1)
-    elif len(args) == 0 or args[0] == "-":
-        infilename = ""
-        if sys.stdin.isatty():
-            # True if the file is connected to a tty device, and False
-            # otherwise (pipeline or file redirection).
-            parser.print_help()
-            sys.exit(1)
-        else:
-            # Handle piped input ($ cat ehv3.raw | pylon | rst2pdf -o ans.pdf).
-            infile = sys.stdin
-    else:
-        infilename = args[0]
-        infile   = open(infilename)
-
-    logger.info("Running Program with: %s" % infilename)
-    logger.info("===================")
-    main2(infile, outfile)
-    logger.info("===================")
-
-if __name__ == "__main__":
-    main()
-
-# EOF -------------------------------------------------------------------------

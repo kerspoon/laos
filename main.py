@@ -83,10 +83,12 @@ def simulate(title):
     print "SE"
     print "================================="
     print se 
+    print "================================="
 
     print "SO"
     print "================================="
     print so 
+    print "================================="
 
 def parselog(title, simtype):
     return SimInLimits(open("psat_" + title + "_01.txt"), simtype)

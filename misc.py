@@ -66,7 +66,6 @@ def test_grem():
     grem(".", ".*\.pyc", True)
     grem(".", "rts_[1234567890]{2}\.txt", True)
 # test_grem()        
-        
 
 #------------------------------------------------------------------------------
 #  as_csv :: [T], str -> str
@@ -106,23 +105,23 @@ class struct(object):
            if we have self.types convert all entries to correct type
         """
 
-        assert entries in self.__dict__
+        assert "entries" in dir(self)
 
-        if types in self.__dict__:
+        if "types" in dir(self):
             assert(len(self.entries) == len(self.types))
 
         if tokens:
             self.dict_fill(tokens)
             self.check_entries()
             
-            if types in self.__dict__:
+            if "types" in dir(self):
                 self.convert_types()
 
     def __str__(self):
         """a simple space seperated string with entries in the 
            same order as 'entries'
         """
-        return as_csv(self.__dict__[x] for x in self.entries, " ")
+        return as_csv([self.__dict__[x] for x in self.entries], " ")
 
     def dict_fill(self, kwds):
         """fill in all 'entries' using the dict 'kwds'"""
@@ -131,20 +130,20 @@ class struct(object):
     def convert_types(self):
         """convert all entries into the proper types using self.types"""
 
-        self.typemap = dict(zip(entries,types))
+        self.typemap = dict(zip(self.entries, self.types))
 
         # typemap = {'bus_id':'int',
         #            'fail_rate':'real',
         #            'repair_rate':'real'}
 
         for member in self.entries:
-            if typemap[member] == "int":
+            if self.typemap[member] == "int":
                 self.__dict__[member] = int(self.__dict__[member])
-            elif typemap[member] == "real":
+            elif self.typemap[member] == "real":
                 self.__dict__[member] = float(self.__dict__[member])
-            elif typemap[member] == "bool":
+            elif self.typemap[member] == "bool":
                 self.__dict__[member] = bool(self.__dict__[member])
-            elif typemap[member] == "str":
+            elif self.typemap[member] == "str":
                 self.__dict__[member] = str(self.__dict__[member])
             else:
                 raise Exception("bad datatype. expected (int, real, bool, str) got " + typemap[member])
@@ -152,11 +151,31 @@ class struct(object):
     def check_entries(self):
         """make sure that all the entries are added"""
         for member in self.entries:
-            assert member in self.__dict__
+            assert member in dir(self), str(member) + " not added"
 
 def read_struct(class_type, cols):
     """read a list of strings as the data for 'class_type'
        e.g. read_struct(Bus, "101 0.025 13".split())
        This should return a Bus with all data filled in.
     """
-    return class_type(dict(zip(class_type.entries, cols))))
+    assert len(class_type.entries) == len(cols), "incomplete info. got " + cols 
+    return class_type(dict(zip(class_type.entries, cols)))
+
+def TEST_struct():
+    class Bus(struct):
+        entries = "bus_id fail_rate repair_rate".split()
+        types = "int real real".split()
+        
+    bus = read_struct(Bus, "101 0.025 13".split())
+    
+    # print bus.bus_id
+    # print bus.fail_rate
+    # print bus.repair_rate
+    # print bus
+
+    assert bus.bus_id == 101
+    assert abs(bus.fail_rate - 0.025) < 0.0001
+    assert abs(bus.repair_rate - 13) < 0.0001
+    assert str(bus) == "101 0.025 13.0"
+
+TEST_struct()

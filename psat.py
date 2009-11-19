@@ -25,6 +25,7 @@
 import sys 
 import logging
 from copy import deepcopy
+from misc import * 
 
 #------------------------------------------------------------------------------
 #  Logging:
@@ -134,7 +135,7 @@ def read_section(stream, items, classtype):
     for line in stream:
         line = line.strip()
 
-        if re.matches(line,"\A\] *;\Z"): # if line == "];"
+        if re.match("\A *\] *; *\Z", line): # if line == "];"
             break
 
         if len(line) == 0 or line.startswith("#"):
@@ -199,7 +200,7 @@ class NetworkData(object):
 
         def title_matches(line, title):
             #todo: replace with regexp
-            return line.startswith(title):
+            return line.startswith(title)
 
         for line in stream:
             line = line.strip()
@@ -207,29 +208,29 @@ class NetworkData(object):
             if len(line) == 0 or line.startswith("#"):
                 continue
             elif title_matches(line, "Bus.con"):
-                read_section(stream, self.busses, Bus)
+                read_section(stream, self.busses, self.Bus)
                 assert len(self.busses) >= 1
             elif title_matches(line, "Line.con"):
-                read_section(stream, self.lines, Line)
+                read_section(stream, self.lines, self.Line)
                 assert len(self.lines) >= 1
             elif title_matches(line, "SW.con"):
-                read_section(stream, self.slack, Slack)
+                read_section(stream, self.slack, self.Slack)
                 assert len(self.slack) == 1
             elif title_matches(line, "PV.con"):
-                read_section(stream, self.generators, Generator)
+                read_section(stream, self.generators, self.Generator)
                 assert len(self.generators) >= 0
             elif title_matches(line, "PQ.con"):
-                read_section(stream, self.loads, Load)
+                read_section(stream, self.loads, self.Load)
                 assert len(self.loads) >= 1
             elif title_matches(line, "Shunt.con"):
-                read_section(stream, self.shunts, Shunt)
+                read_section(stream, self.shunts, self.Shunt)
                 assert len(self.shunts) >= 0
             elif title_matches(line, "Demand.con"):
-                read_section(stream, self.demand, Demand)
+                read_section(stream, self.demand, self.Demand)
                 assert len(self.demand) >= 0 
             elif title_matches(line, "Supply.con"):
-                read_section(stream, self.supply, Supply)
-                assert len(self.Supply) >= 0
+                read_section(stream, self.supply, self.Supply)
+                assert len(self.supply) >= 0
             else:
                 raise Exception("expected matlab section, got " + line)
             
@@ -399,7 +400,7 @@ class SimulationBatch(object):
             elif line[0].startswith("["):
                 title = line[0][1:-1]
                 logger.debug("Added Scenario: %s" % title)
-                self.scenarios.append(Scenario())
+                self.scenarios.append(Scenario(title))
 
             # remove 
             elif line[0] == "remove":
@@ -445,6 +446,9 @@ class SimulationBatch(object):
             else:
                 raise Exception("got %s expected (remove, set, result, [...], #)" % line[0])
 
+    def __iter__(self):
+        return iter(self.scenarios)
+
 #------------------------------------------------------------------------------
 #  
 #------------------------------------------------------------------------------
@@ -453,16 +457,16 @@ def write_scenario(stream, scenario, network):
     """write the network to the file with the changes specified in scenario
     """
 
-    newpsat = deepcopy(psat)
+    newpsat = deepcopy(network)
 
-    for kill in contingency.kill["bus"]:
+    for kill in scenario.kill["bus"]:
         newpsat.remove_bus(kill)
-    for kill in contingency.kill["line"]:
+    for kill in scenario.kill["line"]:
         newpsat.remove_line(kill[0], kill[1])
-    for kill in contingency.kill["generator"]:
+    for kill in scenario.kill["generator"]:
         newpsat.remove_generator(kill)
 
-    if not(len(contingency.supply) == 0 and len(contingency.demand) == 0):
+    if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
         raise Exception("not implemented")
     
     newpsat.write(stream)

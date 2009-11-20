@@ -73,7 +73,7 @@ def make_matlab_script(stream, title, simtype):
 def simulate(title):
     print "simulate", "solve_" + title
 
-    proc = subprocess.Popen('matlab -nodesktop -automation -nodisplay -nojvm -nosplash -r solve_' + title,
+    proc = subprocess.Popen('matlab -nodesktop -automation -nojvm -nosplash -r solve_' + title,
                             shell=True,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
@@ -119,7 +119,7 @@ def main2(psat_file, batch_file, outfile):
 
         simulate(scenario.title)
 
-        scenario.result = parselog(scenario.title, scenario.simtype)
+        # scenario.result = parselog(scenario.title, scenario.simtype)
 
         print "RESULT:", scenario.result
         scenario.write(outfile)
@@ -156,7 +156,7 @@ def main():
  
     # Output.
     if options.output:
-        outfile = options.output
+        outfile = open(options.output,"w")
         if outfile == "-":
             outfile = sys.stdout
     else:

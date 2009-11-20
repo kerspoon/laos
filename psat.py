@@ -146,44 +146,38 @@ def read_section(stream, items, classtype):
 
 class NetworkData(object):
     """matlab psat data file"""
-
+ 
     class Bus(struct):
-        entries = "bus_no v_base v_magnitude_guess \
-                   v_angle_guess area region".split()
-
+        entries = "bus_no v_base v_magnitude_guess v_angle_guess area region".split()
+        types = "int int real real int int".split()
+ 
     class Line(struct):
-        entries = "fbus tbus s_rating v_rating f_rating length v_ratio \
-                   r x b tap shift i_limit p_limit s_limit status".split()
-            
+        entries = "fbus tbus s_rating v_rating f_rating length v_ratio r x b tap shift i_limit p_limit s_limit status".split()
+        types = "int int int int int real real real real real real real real real real int".split()
+ 
     class Slack(struct):
-        entries = "bus_no s_rating v_rating v_magnitude ref_angle \
-                   q_max q_min v_max v_min p_guess lp_coeff \
-                   ref_bus status".split()
+        entries = "bus_no s_rating v_rating v_magnitude ref_angle q_max q_min v_max v_min p_guess lp_coeff ref_bus status".split()
+        types = "int int int real real real real real real real real real int".split()
 
     class Generator(struct):
-        entries = "bus_no s_rating v_rating p v q_max q_min \
-                   v_max v_min lp_coeff status".split()
+        entries = "bus_no s_rating v_rating p v q_max q_min v_max v_min lp_coeff status".split()
+        types = "int int int real real real real real real real int".split()
 
     class Load(struct):
-        entries = "bus_no s_rating v_rating p q v_max v_min \
-                   z_conv status".split()
+        entries = "bus_no s_rating v_rating p q v_max v_min z_conv status".split()
+        types = "int int int real real real real real int".split()
 
     class Shunt(struct):
         entries = "bus_no s_rating v_rating f_rating g b status".split()
+        types = "int int int int real real int".split()
 
     class Demand(struct):
-        entries = "bus_no s_rating p_direction q_direction \
-            p_bid_max p_bid_min p_optimal_bid p_fixed \
-            p_proportional p_quadratic q_fixed q_proportional \
-            q_quadratic commitment cost_tie_break cost_cong_up \
-            cost_cong_down status".split()
+        entries = "bus_no s_rating p_direction q_direction p_bid_max p_bid_min p_optimal_bid p_fixed p_proportional p_quadratic q_fixed q_proportional q_quadratic commitment cost_tie_break cost_cong_up cost_cong_down status".split()
+        types = "int int real real real real real real real real real real real real real real real int".split()
 
     class Supply(struct):
-        entries = "bus_no s_rating p_direction p_bid_max \
-            p_bid_min p_bid_actual p_fixed p_proportional \
-            p_quadratic q_fixed q_proportional q_quadratic \
-            commitment cost_tie_break lp_factor q_max q_min \
-            cost_cong_up cost_cong_down status".split()
+        entries = "bus_no s_rating p_direction p_bid_max p_bid_min p_bid_actual p_fixed p_proportional p_quadratic q_fixed q_proportional q_quadratic commitment cost_tie_break lp_factor q_max q_min cost_cong_up cost_cong_down status".split()
+        types = "int int real real real real real real real real real real real real real real real real real int".split()
 
     def __init__(self):
         self.busses = []

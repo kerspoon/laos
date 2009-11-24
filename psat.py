@@ -94,11 +94,11 @@ class NetworkProbability(object):
 
         def setup(self):
             failrate = self.fail_rate / (24.0 * 365.0)
-            mttf = (24.0 * 365.0) / self.fail_rate
-            mttr = self.repair_rate
+            mttf = float((24.0 * 365.0) / self.fail_rate)
+            mttr = float(self.repair_rate)
             self.pfail = 1-probability_failure(failrate)
             self.pout = 1-probability_outage(mttf, mttr)
-            print "Bus: %f %f" % (self.pfail, self.pout)
+            # print "Bus: %f %f" % (self.pfail, self.pout)
 
     class Line(struct):
         entries = "name fbus tbus fail_rate repair_rate trans_fail".split()
@@ -106,11 +106,11 @@ class NetworkProbability(object):
 
         def setup(self):
             failrate = self.fail_rate / (24.0 * 365.0)
-            mttf = (24.0 * 365.0) / self.fail_rate
-            mttr = self.repair_rate
+            mttf = float((24.0 * 365.0) / self.fail_rate)
+            mttr = float(self.repair_rate)
             self.pfail = 1-probability_failure(failrate)
             self.pout = 1-probability_outage(mttf, mttr)
-            print "Line: %f %f" % (self.pfail , self.pout)
+            # print "Line: %f %f" % (self.pfail , self.pout)
 
     class Generator(struct):
         entries = "name bus_id mttf mttr gen_type".split()
@@ -122,15 +122,23 @@ class NetworkProbability(object):
                 self.pout = 0 
             else:
                 failrate = 1.0 / self.mttf
-                mttf = self.mttf
-                mttr = self.mttr
+                mttf = float(self.mttf)
+                mttr = float(self.mttr)
                 self.pfail = 1-probability_failure(failrate)
-                self.pout = probability_outage(mttf, mttr)
-            print "Generator: %f %f" % (self.pfail , self.pout)
+                # print mttf, mttr 
+                self.pout = 1-probability_outage(mttf, mttr)
+            # print "Generator: %f %f" % (self.pfail, self.pout)
 
     class Crow(struct):
         entries = "line1 line2 probability".split()
         types = "str str real".split()
+        
+        def setup(self, lines):
+            for line in lines:
+                if line.name == self.line1:
+                    self.line_1_id = line.fbus, line.tbus
+                if line.name == self.line2:
+                    self.line_2_id = line.fbus, line.tbus
 
     def __init__(self):
         self.busses = []
@@ -158,6 +166,9 @@ class NetworkProbability(object):
             else:
                 raise Exception("expected (bus, line, generator, crow) got " + cols[0])
 
+        for crow in self.crows:
+            crow.setup(self.lines)
+
     def write(self, stream):
         stream.write("# NetworkProbability data file\n")
 
@@ -177,20 +188,37 @@ class NetworkProbability(object):
         for crow in self.crows:
             stream.write("crow " + str(crow) + "\n")
 
-    def outages(self):
+    def crow_fails(self, linekill):
+        crowfails = []
+        for kill in linekill:
+            for crow in self.crows:
+                if crow.line_1_id == kill:
+                    if fail(crow.probability):
+                        print "crow fail:", crow.line_1_id, kill
+                        crowfails.append(crow.line_2_id)
+        return crowfails
 
-        scen = Scenario("test")
+    def outages(self, name):
+
+        scen = Scenario("outage" + name, "opf")
         scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pout)]
         scen.kill["line"] = [(line.fbus, line.tbus) for line in 
                              self.lines if fail(line.pout)]
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pout)]
+        scen.kill["line"] = scen.kill["line"] + self.crowfails(scen.kill["line"])
 
-        # todo: deal with killing a crow
-        # for kill in scen.kill["line"]:
-        #     for crow in self.crows:
-        #         if crow.bus1 == kill and crow.fail():
-        #             scen.kill["line"].append(crow)
+        return scen
+
+    def failures(self, name):
+        
+        scen = Scenario("failures" + name, "pf")
+        scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pfail)]
+        scen.kill["line"] = [(line.fbus, line.tbus) for line in 
+                             self.lines if fail(line.pfail)]
+        scen.kill["generator"] = [generator.bus_id for generator in 
+                                  self.generators if fail(generator.pfail)]
+        scen.kill["line"] = scen.kill["line"] + self.crowfails(scen.kill["line"])
 
         return scen
 
@@ -394,9 +422,9 @@ class NetworkData(object):
 #------------------------------------------------------------------------------
 
 class Scenario(object):
-    def __init__(self, title):
+    def __init__(self, title, simtype="pf"):
         self.title = title
-        self.simtype = "pf"
+        self.simtype = simtype
         self.kill = {'bus':[], 'generator':[], 'line':[]}
         self.supply = {}
         self.demand = {}

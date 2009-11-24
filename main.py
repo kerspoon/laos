@@ -71,24 +71,26 @@ def make_matlab_script(stream, title, simtype):
     #todo: do i need to close these files? 
 
 def simulate(title):
-    print "simulate", "solve_" + title
 
-    proc = subprocess.Popen('matlab -nodesktop -automation -nojvm -nosplash -r solve_' + title,
+    print "simulate 'solve_" + title + "'"
+
+    proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r solve_' + title,
                             shell=True,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             stdin=subprocess.PIPE)
+
     so, se = proc.communicate()
 
-    print "SE"
-    print "================================="
-    print se 
-    print "================================="
+    # print "SE"
+    # print "================================="
+    # print se 
+    # print "================================="
 
-    print "SO"
-    print "================================="
-    print so 
-    print "================================="
+    # print "SO"
+    # print "================================="
+    # print so 
+    # print "================================="
 
 def parselog(title, simtype):
     return SimInLimits(open("psat_" + title + "_01.txt"), simtype)
@@ -119,7 +121,7 @@ def main2(psat_file, batch_file, outfile):
 
         simulate(scenario.title)
 
-        # scenario.result = parselog(scenario.title, scenario.simtype)
+        scenario.result = parselog(scenario.title, scenario.simtype)
 
         print "RESULT:", scenario.result
         scenario.write(outfile)

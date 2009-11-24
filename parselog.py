@@ -55,12 +55,11 @@ def forward_to_line(stream, line):
 
 def SimInLimits(stream, simtype):
 
-    if simtype == "powerflow":
+    if simtype == "pf":
         if nextline(stream) != "POWER FLOW REPORT\n":
             logger.info("fail: incorrect title")
             return False
-
-    elif simtype == "optimalpowerflow":
+    elif simtype == "opf":
         if nextline(stream) != "OPTIMAL POWER FLOW REPORT\n":
             logger.info("fail: incorrect title")
             return False
@@ -75,13 +74,13 @@ def SimInLimits(stream, simtype):
 
     inlimits = True
 
-    if simtype == "powerflow":
+    if simtype == "pf":
         inlimits &= nextline(stream).startswith("ALL VOLTAGES WITHIN LIMITS")
         inlimits &= nextline(stream).startswith("ALL REACTIVE POWER WITHIN LIMITS")
         inlimits &= nextline(stream).startswith("ALL CURRENT FLOWS WITHIN LIMITS")
         inlimits &= nextline(stream).startswith("ALL REAL POWER FLOWS WITHIN LIMITS")
         inlimits &= nextline(stream).startswith("ALL APPARENT POWER FLOWS WITHIN LIMITS")
-    elif simtype == "optimalpowerflow":
+    elif simtype == "opf":
         inlimits &= nextline(stream).startswith("ALL VOLTAGES WITHIN LIMITS")
         inlimits &= nextline(stream).startswith("ALL REACTIVE POWERS WITHIN LIMITS")
         inlimits &= nextline(stream).startswith("ALL CURRENT FLOWS WITHIN LIMITS")
@@ -116,7 +115,7 @@ def main():
     """
     parser = optparse.OptionParser("usage: parselog [options] input_file")
 
-    parser.add_option("-t", "--type", dest="simtype", default="powerflow",
+    parser.add_option("-t", "--type", dest="simtype", default="pf",
         help="read as a PSAT 'powerflow' or 'optimalpowerflow'")
 
     parser.add_option("-o", "--output", dest="output", metavar="FILE",

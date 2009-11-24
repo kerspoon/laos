@@ -158,7 +158,7 @@ def read_struct(class_type, cols):
        e.g. read_struct(Bus, "101 0.025 13".split())
        This should return a Bus with all data filled in.
     """
-    assert len(class_type.entries) == len(cols), "incomplete info. got " + cols 
+    assert len(class_type.entries) == len(cols), "incomplete info. got " + str(cols)
     return class_type(dict(zip(class_type.entries, cols)))
 
 def TEST_struct():

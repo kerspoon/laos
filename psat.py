@@ -42,7 +42,6 @@ logger = logging.getLogger(__name__)
 #
 #------------------------------------------------------------------------------
 
-
 def probability_failure(failrate):
     # probability_failure :: real(>0) -> real(0,1)
     """returns the probability of a component 
@@ -209,7 +208,7 @@ class NetworkProbability(object):
                              self.lines if fail(line.pout)]
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pout)]
-        scen.kill["line"] = scen.kill["line"] + self.crowfails(scen.kill["line"])
+        scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
 
         return scen
 
@@ -221,7 +220,7 @@ class NetworkProbability(object):
                              self.lines if fail(line.pfail)]
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pfail)]
-        scen.kill["line"] = scen.kill["line"] + self.crowfails(scen.kill["line"])
+        scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
 
         return scen
 

@@ -42,7 +42,6 @@ logger = logging.getLogger(__name__)
 #
 #------------------------------------------------------------------------------
 
-
 def probability_failure(failrate):
     # probability_failure :: real(>0) -> real(0,1)
     """returns the probability of a component 
@@ -53,8 +52,9 @@ def probability_failure(failrate):
     assert(0 <= res <= 1), "probability: " + str(res)
     return res
 
-# probability_outage :: real(>0), real(>0) -> real(0,1)
+
 def probability_outage(mttf, mttr):
+    # probability_outage :: real(>0), real(>0) -> real(0,1)
     """returns the probability of a component 
     being on outage given the mean time to fail
     and restore"""
@@ -64,8 +64,10 @@ def probability_outage(mttf, mttr):
     assert(0 <= res <= 1), "probability: " + str(res)
     return res
 
+
 def fail(pfail):
     return random.random() < pfail
+
 
 class NetworkProbability(object):
     """
@@ -206,19 +208,19 @@ class NetworkProbability(object):
                              self.lines if fail(line.pout)]
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pout)]
-        scen.kill["line"] = scen.kill["line"] + self.crowfails(scen.kill["line"])
+        scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
 
         return scen
 
     def failures(self, name):
         
-        scen = Scenario("failures" + name, "pf")
+        scen = Scenario("failure" + name, "pf")
         scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pfail)]
         scen.kill["line"] = [(line.fbus, line.tbus) for line in 
                              self.lines if fail(line.pfail)]
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pfail)]
-        scen.kill["line"] = scen.kill["line"] + self.crowfails(scen.kill["line"])
+        scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
 
         return scen
 

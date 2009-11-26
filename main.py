@@ -17,11 +17,12 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 #------------------------------------------------------------------------------
- 
+
 """ Package info:
 James Brooks (kerspoon)
 
-Simulate all contingencies in the batch file using the psat file as a base. Process the results and output. 
+Simulate all contingencies in the batch file using the psat file as a 
+base. Process the results and output.
 """
  
 #------------------------------------------------------------------------------

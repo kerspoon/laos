@@ -49,9 +49,13 @@ def nextline(stream):
     return stream.next()
 
 def forward_to_line(stream, line):
-    for stline in stream:
-        if line == stline:
-            return
+    try:
+        for stline in stream:
+            if line == stline:
+                return
+    except EndofFile:
+        logger.info("fail: missing limits section")
+        raise Exception("expected line: " + line)
 
 def SimInLimits(stream, simtype):
 
@@ -66,26 +70,20 @@ def SimInLimits(stream, simtype):
     else:
         raise Exception("bad call to function 'check'")
 
-    try:
-        forward_to_line(stream, 'LIMIT VIOLATION STATISTICS\n')
-    except EndofFile:
-        logger.info("fail: missing limits section")
-        return False
-
+    forward_to_line(stream, 'LIMIT VIOLATION STATISTICS\n')
     inlimits = True
-
     if simtype == "pf":
-        inlimits &= nextline(stream).startswith("ALL VOLTAGES WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL REACTIVE POWER WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL CURRENT FLOWS WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL REAL POWER FLOWS WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL APPARENT POWER FLOWS WITHIN LIMITS")
+        inlimits &= nextline(stream).startswith("ALL VOLTAGE")
+        inlimits &= nextline(stream).startswith("ALL REACTIVE POWER")
+        inlimits &= nextline(stream).startswith("ALL CURRENT FLOW")
+        inlimits &= nextline(stream).startswith("ALL REAL POWER FLOW")
+        inlimits &= nextline(stream).startswith("ALL APPARENT POWER FLOW")
     elif simtype == "opf":
-        inlimits &= nextline(stream).startswith("ALL VOLTAGES WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL REACTIVE POWERS WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL CURRENT FLOWS WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL REAL POWER FLOWS WITHIN LIMITS")
-        inlimits &= nextline(stream).startswith("ALL APPARENT POWER FLOWS WITHIN LIMITS")
+        inlimits &= nextline(stream).startswith("ALL VOLTAGE")
+        inlimits &= nextline(stream).startswith("ALL REACTIVE POWER")
+        inlimits &= nextline(stream).startswith("ALL CURRENT FLOW")
+        inlimits &= nextline(stream).startswith("ALL REAL POWER FLOW")
+        inlimits &= nextline(stream).startswith("ALL APPARENT POWER FLOW")
     else:
         raise Exception("bad call to function 'check'")
         
@@ -179,3 +177,4 @@ if __name__ == "__main__":
 
 
 # EOF -------------------------------------------------------------------------
+

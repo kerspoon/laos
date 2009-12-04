@@ -66,6 +66,8 @@ def make_matlab_script(stream, title, simtype):
         base_file = "pf_solve.m"
     elif simtype == "opf":
         base_file = "opf_solve.m"
+    else:
+        raise Exception()
 
     new_text = open(base_file).read().replace('psatfilename', "psat_" + title)
     stream.write(new_text)
@@ -109,6 +111,7 @@ def main2(psat_file, batch_file, outfile):
     batch.read(batch_file)
 
     for scenario in batch:
+        print scenario.simtype
 
         remove_files(scenario.title)
 

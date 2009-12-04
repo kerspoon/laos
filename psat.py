@@ -501,8 +501,10 @@ class SimulationBatch(object):
             # title
             elif line[0].startswith("["):
                 title = line[0][1:-1]
+                simtype = line[1]
+                assert simtype == "pf" or simtype == "opf"
                 logger.debug("Added Scenario: %s" % title)
-                self.scenarios.append(Scenario(title))
+                self.scenarios.append(Scenario(title, simtype))
 
             # remove 
             elif line[0] == "remove":

@@ -132,6 +132,10 @@ def GetPflow():
 
     buses = OneOrMore(busdef.setParseAction(process_pflow_bus))
 
+    limvoltmin = And([slit("Minimum voltage limit violation at bus <"),
+                   busname.setResultsName("limvoltmin"),
+                   slit("> [V_min =") + decimal.suppress() + slit("]")])
+
     topvolt = And([slit("Maximum voltage at bus <"),
                    busname.setResultsName("topvolt"),
                    slit(">")])
@@ -140,7 +144,8 @@ def GetPflow():
                     busname.setResultsName("limreact"),
                     slit("> [Qg_max =") + decimal.suppress() + slit("]")])
 
-    limits = OneOrMore(topvolt | limreact).setParseAction(process_pflow_bus_limit)
+    limline = limvoltmin | topvolt | limreact
+    limits = OneOrMore(limline).setParseAction(process_pflow_bus_limit)
 
     return title + head1 + head2 + buses + limits
 
@@ -201,11 +206,11 @@ def ensure(cond, text):
 
 def process_header_title(tokens):
     # print("Header : %s" % tokens)
-    if len(tokens) == 1:
-        # print "Power Flow"
+    if len(tokens[0]) == 1:
+        print "Power Flow"
         pass 
-    # elif len(tokens) == 2:
-    #     print "Optimal Power Flow"
+    elif len(tokens[0]) == 2:
+        print "Optimal Power Flow"
     else:
         raise Exception("%s" % tokens)
 
@@ -259,4 +264,4 @@ def process_limits(tokens):
     # print("Limits : %s" % tokens)
     pass
 
-parse_stream(open("psat_outage0_01.txt"))
+# parse_stream(open("psat_outage0_01.txt"))

@@ -352,7 +352,7 @@ class NetworkData(object):
         matches = [x for x in self.busses if x.bus_no == bus_no]
 
         if len(matches) == 0:
-            logger.info("Unable to find item")
+            logger.info("Unable to find bus: " + str(bus_no))
             return
 
         # bus names must be unique
@@ -384,7 +384,7 @@ class NetworkData(object):
         matches = [x for x in self.lines if test(x)]
 
         # remove it 
-        self.remove_item(matches, self.lines, line_no)
+        self.remove_item(matches, self.lines, line_no, (fbus, tbus))
             
     def remove_generator(self, bus_no, gen_no=None):
         
@@ -396,14 +396,14 @@ class NetworkData(object):
         supply_matches = [x for x in self.supply if x.bus_no == bus_no]
 
         # remove it 
-        self.remove_item(gen_matches, self.generators, gen_no)
-        self.remove_item(supply_matches, self.supply, gen_no)
+        self.remove_item(gen_matches, self.generators, gen_no, bus_no)
+        self.remove_item(supply_matches, self.supply, gen_no, bus_no)
         
-    def remove_item(self, matches, iterable, item_no):
+    def remove_item(self, matches, iterable, item_no, bus_no):
 
         # error if no matches 
         if len(matches) == 0:
-            logger.info("Unable to find item")
+            logger.info("Unable to find item: " + str(bus_no))
         # simple if one match 
         elif len(matches) == 1:
             iterable.remove(matches[0])

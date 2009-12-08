@@ -480,15 +480,15 @@ class SimulationBatch(object):
         def add_kill(component, name):
             # add the kill to the current contingency
             self.scenarios[-1].kill[component].append(name)
-            logger.debug("Kill: %s[%s]" % (component, name))
+            # logger.debug("Kill: %s[%s]" % (component, name))
         
         def set_supply(bus_no, value):
             self.scenarios[-1].supply[bus_no] = value
-            logger.debug("Set supply: bus[%s]=%f" % (bus_no, value))
+            # logger.debug("Set supply: bus[%s]=%f" % (bus_no, value))
         
         def set_demand(bus_no, value):
             self.scenarios[-1].demand[bus_no] = value
-            logger.debug("Set demand: bus[%s]=%f" % (bus_no, value))
+            # logger.debug("Set demand: bus[%s]=%f" % (bus_no, value))
 
         for line in stream:
 
@@ -503,7 +503,7 @@ class SimulationBatch(object):
                 title = line[0][1:-1]
                 simtype = line[1]
                 assert simtype == "pf" or simtype == "opf"
-                logger.debug("Added Scenario: %s" % title)
+                # logger.debug("Added Scenario: %s" % title)
                 self.scenarios.append(Scenario(title, simtype))
 
             # remove 
@@ -538,13 +538,12 @@ class SimulationBatch(object):
             elif line[0] == "result":
                 if line[1] == "pass":
                     self.scenarios[-1].result = True
-                    logger.debug("result pass")
+                    # logger.debug("result pass")
                 elif line[1] == "fail":
                     self.scenarios[-1].result = False
-                    logger.debug("result fail")
+                    # logger.debug("result fail")
                 else:
                     raise Exception("got %s expected (pass, fail)" % line[1])
-                    
                     
             # nothing else allowed
             else:

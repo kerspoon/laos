@@ -26,9 +26,7 @@ A program to parse a PSAT results file and say if it's in limits.
 #------------------------------------------------------------------------------
 
 import sys 
-import optparse
 import logging
-from os.path import basename, splitext
 
 #------------------------------------------------------------------------------
 #  Logging:

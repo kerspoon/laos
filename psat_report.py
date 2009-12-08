@@ -237,7 +237,11 @@ class PSATreport(object):
                         busname.setResultsName("limreact"),
                         slit("> [Qg_max =") + decimal.suppress() + slit("]")])
 
-        limline = limvoltmin | topvolt | limreact
+        topreact = And([slit("Maximum reactive power at bus <"),
+                        busname.setResultsName("topreact"),
+                        slit(">")])
+
+        limline = limvoltmin | topvolt | limreact | topreact
         limits = OneOrMore(limline).setParseAction(self.process_pflow_bus_limit)
 
         return title + head1 + head2 + buses + limits

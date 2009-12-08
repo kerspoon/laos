@@ -146,7 +146,7 @@ class struct(object):
             elif self.typemap[member] == "str":
                 self.__dict__[member] = str(self.__dict__[member])
             else:
-                raise Exception("bad datatype. expected (int, real, bool, str) got " + typemap[member])
+                raise Exception("bad datatype. expected (int, real, bool, str) got " + self.typemap[member])
 
     def check_entries(self):
         """make sure that all the entries are added"""

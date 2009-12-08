@@ -32,12 +32,8 @@ base. Process the results and output.
 import sys
 import optparse
 import logging
-import os
-import re 
 import time 
-import copy 
 import subprocess
-from os.path import basename, splitext
 from parselog import SimInLimits
 from psat import write_scenario, SimulationBatch, NetworkData
 from misc import *

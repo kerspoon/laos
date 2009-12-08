@@ -56,6 +56,7 @@ def almost_equal(x, y):
 def ensure(cond, text):
     if not cond:
         print "FAIL!!!\t", text
+        self.acceptable = False
 
 #------------------------------------------------------------------------------
 # PSATreport:
@@ -101,19 +102,27 @@ class PSATreport(object):
         self.power_flow = []
         self.line_flow = []
 
+        self.acceptable = True
+
     def parse_stream(self, stream):
         logger.debug("Parsing stream: %s" % stream)
 
-        headers = self.GetHeaders()
-        stats = self.GetStats()
-        pflow = self.GetPflow()
-        lineflow = self.GetLineflow()
-        summary = self.GetSummary()
-        limits = self.GetLimits()
+        try:
+            headers = self.GetHeaders()
+            stats = self.GetStats()
+            pflow = self.GetPflow()
+            lineflow = self.GetLineflow()
+            summary = self.GetSummary()
+            limits = self.GetLimits()
 
-        case = headers + stats + pflow + lineflow + summary + limits
-        data = case.parseFile(stream)
-        logger.debug("Done Parsing stream")
+            case = headers + stats + pflow + lineflow + summary + limits
+            data = case.parseFile(stream)
+            logger.debug("Done Parsing stream")
+        except:
+            logger.debug("PARSING ERROR")
+            return None
+
+        return self.acceptable
 
     def process_header_title(self, tokens):
         # print("Header : %s" % tokens)
@@ -180,6 +189,10 @@ class PSATreport(object):
 
     def process_limits(self, tokens):
         # print("Limits : %s" % tokens)
+
+        if any((tok in tokens) for tok in ["reactfail", "voltfail"]):
+            self.acceptable = False
+        
         pass
 
     #------------------------------------------------------------------------------
@@ -200,18 +213,18 @@ class PSATreport(object):
 
     def GetStats(self):
         ntitle = slit("NETWORK STATISTICS")
-        buses = slit("Buses:") + integer.setResultsName("buses")
-        lines = slit("Lines:") + integer.setResultsName("lines")
-        transformers = slit("Transformers:") + integer.setResultsName("transformers")
-        generators = slit("Generators:") + integer.setResultsName("generators")
-        loads = slit("Loads:") + integer.setResultsName("loads")
+        buses = slit("Buses:") + integer("buses")
+        lines = slit("Lines:") + integer("lines")
+        transformers = slit("Transformers:") + integer("transformers")
+        generators = slit("Generators:") + integer("generators")
+        loads = slit("Loads:") + integer("loads")
         ngroup = Group(ntitle + buses + lines + transformers + generators + loads)
 
         stitle = slit("SOLUTION STATISTICS")
-        iterations = slit("Number of Iterations:") + integer.setResultsName("iterations")
-        pmismatch = slit("Maximum P mismatch [p.u.]") + decimal.setResultsName("pmis")
-        qmismatch = slit("Maximum Q mismatch [p.u.]") + decimal.setResultsName("qmis")
-        rate = slit("Power rate [MVA]") + decimal.setResultsName("rate")
+        iterations = slit("Number of Iterations:") + integer("iterations")
+        pmismatch = slit("Maximum P mismatch [p.u.]") + decimal("pmis")
+        qmismatch = slit("Maximum Q mismatch [p.u.]") + decimal("qmis")
+        rate = slit("Power rate [MVA]") + decimal("rate")
         sgroup = Group(stitle + iterations + pmismatch + qmismatch + rate)
 
         return (ngroup + sgroup).setParseAction(self.process_stats)
@@ -221,28 +234,32 @@ class PSATreport(object):
         head1 = stringtolits("Bus V phase P gen Q gen P load Q load")
         head2 = stringtolits("[p.u.] [rad] [p.u.] [p.u.] [p.u.] [p.u.]")
 
-        busdef = busname.setResultsName("bus") + decimaltable("v phase pg qg pl ql".split())
+        busdef = busname("bus") + decimaltable("v phase pg qg pl ql".split())
 
         buses = OneOrMore(busdef.setParseAction(self.process_pflow_bus))
 
-        limvoltmin = And([slit("Minimum voltage limit violation at bus <"),
-                       busname.setResultsName("limvoltmin"),
-                       slit("> [V_min =") + decimal.suppress() + slit("]")])
+        limvoltmin = (slit("Minimum voltage limit violation at bus <") +
+                      busname("limvoltmin") +
+                      slit("> [V_min =") + 
+                      decimal.suppress() + 
+                      slit("]"))
 
-        topvolt = And([slit("Maximum voltage at bus <"),
-                       busname.setResultsName("topvolt"),
-                       slit(">")])
+        topvolt = (slit("Maximum voltage at bus <") +
+                   busname("topvolt") +
+                   slit(">"))
 
-        limreact = And([slit("Maximum reactive power limit violation at bus <"),
-                        busname.setResultsName("limreact"),
-                        slit("> [Qg_max =") + decimal.suppress() + slit("]")])
+        limreact = (slit("Maximum reactive power limit violation at bus <") +
+                    busname("limreact") +
+                    slit("> [Qg_max =") + 
+                    decimal.suppress() + 
+                    slit("]"))
 
-        topreact = And([slit("Maximum reactive power at bus <"),
-                        busname.setResultsName("topreact"),
-                        slit(">")])
+        topreact = (slit("Maximum reactive power at bus <") +
+                    busname("topreact") +
+                    slit(">"))
 
         limline = limvoltmin | topvolt | limreact | topreact
-        limits = OneOrMore(limline).setParseAction(self.process_pflow_bus_limit)
+        limits = ZeroOrMore(limline).setParseAction(self.process_pflow_bus_limit)
 
         return title + head1 + head2 + buses + limits
 
@@ -251,10 +268,10 @@ class PSATreport(object):
         head1 = stringtolits("From Bus To Bus Line P Flow Q Flow P Loss Q Loss")
         head2 = stringtolits("[p.u.] [p.u.] [p.u.] [p.u.]")
 
-        busdef = And([busname.setResultsName("bus1"),
-                      busname.setResultsName("bus2"),
-                      integer.setResultsName("linenum"),
-                      decimaltable("pf qf pl ql".split())])
+        busdef = (busname("bus1") +
+                  busname("bus2") +
+                  integer("linenum") +
+                  decimaltable("pf qf pl ql".split()))
 
         busdef = busdef.setParseAction(self.process_lineflow_bus)
         buses = OneOrMore(busdef)
@@ -278,11 +295,18 @@ class PSATreport(object):
     def GetLimits(self):
         title = slit("LIMIT VIOLATION STATISTICS")
 
-        volt = slit("ALL VOLTAGES WITHIN LIMITS") + restOfLine.suppress()
+        voltfail = slit("# OF VOLTAGE LIMIT VIOLATIONS:") + integer("voltfail")
+        voltpass = slit("ALL VOLTAGES WITHIN LIMITS") + restOfLine.suppress()
+        volt = voltpass | voltfail
 
-        reactpass = slit("ALL REACTIVE POWER WITHIN LIMITS") + restOfLine.suppress()
-        reactfail = And([slit("# OF REACTIVE POWER LIMIT VIOLATIONS:"),
-                         integer.setResultsName("reactfail")])
+        reactpass = (slit("ALL REACTIVE POWER") + 
+                     Optional("S").suppress() + 
+                     slit("WITHIN LIMITS") + 
+                     restOfLine.suppress())
+
+        reactfail = (slit("# OF REACTIVE POWER LIMIT VIOLATIONS:") +
+                     integer("reactfail"))
+
         react = reactfail | reactpass
 
         current = slit("ALL CURRENT FLOWS WITHIN LIMITS") + restOfLine.suppress()
@@ -295,6 +319,6 @@ class PSATreport(object):
 #
 #------------------------------------------------------------------------------
 
-PSATreport().parse_stream(open("psat_01.txt"))
+# PSATreport().parse_stream(open("psat_01.txt"))
 
 

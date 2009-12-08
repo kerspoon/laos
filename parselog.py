@@ -55,7 +55,8 @@ def forward_to_line(stream, line):
 
 def SimInLimits(stream, simtype):
     import psat_report
-    psat_report.parse_stream(stream)
+    psat_report.PSATreport().parse_stream(stream)
+    return None
 
 def SimInLimits2(stream, simtype):
 

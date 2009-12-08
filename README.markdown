@@ -93,4 +93,7 @@ The idea is to run it many times and see if the results match the input probabil
     /home/james/laos $ python batch.py -o rts.batch -i 100000 rts.net
     /home/james/laos $ sort test.batch | grep -v '^\[' | uniq -c > test_res.batch
 
+Runing 
 
+    /home/james/laos $ python batch.py -t failures -o rts.batch -i 100000 rts.net
+    /home/james/laos $ python main.py rts.m rts.batch -o rts.res

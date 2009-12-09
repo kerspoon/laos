@@ -53,11 +53,6 @@ def dec_check(val, vmin=Decimal("-1.0"), vmax=Decimal("1.0")):
 def almost_equal(x, y):
     return abs(Decimal(x) - Decimal(y)) < Decimal("0.001")
 
-def ensure(cond, text):
-    if not cond:
-        print "FAIL!!!\t", text
-        self.acceptable = False
-
 #------------------------------------------------------------------------------
 # PSATreport:
 #------------------------------------------------------------------------------
@@ -124,6 +119,11 @@ class PSATreport(object):
 
         return self.acceptable
 
+    def ensure(self, cond, text):
+        if not cond:
+            print "FAIL!!!\t", text
+            self.acceptable = False
+
     def process_header_title(self, tokens):
         # print("Header : %s" % tokens)
         if len(tokens[0]) == 1:
@@ -139,12 +139,12 @@ class PSATreport(object):
 
         for x in "loads generators transformers lines buses".split():
             y = tokens[0][x]
-            ensure(y > 0, "incorrect number of components, got " + str(y))
+            self.ensure(y > 0, "incorrect number of components, got " + str(y))
 
-        ensure(1 <= tokens[1]["iterations"] <= 10000, "error : \n%s" % tokens)
-        ensure(dec_check(tokens[1]["pmis"]), "error : \n%s" % tokens)
-        ensure(dec_check(tokens[1]["qmis"]), "error : \n%s" % tokens)
-        ensure(almost_equal("100", tokens[1]["rate"]), "error : \n%s" % tokens)
+        self.ensure(1 <= tokens[1]["iterations"] <= 10000, "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens[1]["pmis"]), "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens[1]["qmis"]), "error : \n%s" % tokens)
+        self.ensure(almost_equal("100", tokens[1]["rate"]), "error : \n%s" % tokens)
 
         self.num_load = tokens[0]["loads"]
         self.num_generator = tokens[0]["generators"]
@@ -159,12 +159,12 @@ class PSATreport(object):
 
         pu_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
         for x in "v pg qg pl ql".split():
-            ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
-        ensure(dec_check(tokens["phase"],"-1.0","1.0"), "error : \n%s" % tokens)
+            self.ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["phase"],"-1.0","1.0"), "error : \n%s" % tokens)
 
     def process_pflow_bus_limit(self, tokens):
         # print("Limit : %s" % tokens)
-        ensure("limreact" not in tokens, "Reactive Power Limit")
+        self.ensure("limreact" not in tokens, "Reactive Power Limit")
         pass
 
     def process_lineflow_bus(self, tokens):
@@ -174,18 +174,18 @@ class PSATreport(object):
 
         pu_check = lambda x: dec_check(x, Decimal("-5.0"), Decimal("5.0"))
         for x in "pf qf pl ql".split():
-            ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
-        ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
+            self.ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
+        self.ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
 
     def process_summary(self, tokens):
         # print("Summary : %s" % tokens)
 
         inrange = lambda x: dec_check(x, Decimal("0.0"), Decimal("100.0"))
         for x in range(4):
-            ensure(inrange(x), "error : \n%s" % tokens)
+            self.ensure(inrange(x), "error : \n%s" % tokens)
 
-        ensure(dec_check(tokens[4], Decimal("-10.0"), Decimal("10.0")), "error : \n%s" % tokens)
-        ensure(dec_check(tokens[5], Decimal("-10.0"), Decimal("10.0")), "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens[4], Decimal("-10.0"), Decimal("10.0")), "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens[5], Decimal("-10.0"), Decimal("10.0")), "error : \n%s" % tokens)
 
     def process_limits(self, tokens):
         # print("Limits : %s" % tokens)

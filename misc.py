@@ -55,12 +55,12 @@ def grem(path, pattern, test=False):
             name = os.path.join(path, each)
             try:
                 if not test: os.remove(name)
-                logger.info("Grem removed " + name)
+                # logger.info("Grem removed " + name)
             except:
                 if not test: 
                     grem(name, '')
                     os.rmdir(name)
-                logger.info("Grem removed dir " + name)
+                # logger.info("Grem removed dir " + name)
 
 def test_grem():
     grem(".", ".*\.pyc", True)

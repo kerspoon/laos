@@ -125,6 +125,7 @@ def main2(psat_file, batch_file, outfile):
 
         print "RESULT:", scenario.result
         scenario.write(outfile)
+        outfile.flush()
 
 #------------------------------------------------------------------------------
 # "main" function:

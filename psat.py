@@ -449,8 +449,10 @@ class Scenario(object):
         if self.result != None: # damn python's multiple true values
             if self.result == True:
                 stream.write("  result pass\n")
-            else:
+            elif self.result == False:
                 stream.write("  result fail\n")
+            else:
+                stream.write(str(self.result) + "\n")
 
 class SimulationBatch(object):
     """

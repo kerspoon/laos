@@ -68,37 +68,38 @@ def test_grem():
     grem(".", "rts_[1234567890]{2}\.txt", True)
 # test_grem()        
 
-
 #------------------------------------------------------------------------------
 # splitEvery
 #------------------------------------------------------------------------------
 
-def splitEvery(n, it):
+def splitEvery(n, iterable):
     """
     splitEvery :: Int -> [e] -> [[e]]
     @'splitEvery' n@ splits a list into length-n pieces.  The last
     piece will be shorter if @n@ does not evenly divide the length of
     the list.
+    from: http://stackoverflow.com/questions/1915170#1915307
     """
-    res = list(itertools.islice(it, n))
-    while len(res) != 0:
-        yield res
-        res = list(itertools.islice(it, n))
+    i = iter(iterable)
+    piece = list(itertools.islice(i, n))
+    while piece:
+        yield piece
+        piece = list(itertools.islice(i, n))
 
 def TEST_splitEvery():
-    listify = lambda y: [list(x) for x in list(y)]
+    # should not enter infinite loop with generators and lists
+    splitEvery(itertools.count(), 10)
+    splitEvery(range(1000), 10)
 
-    co = itertools.islice(itertools.count(), 10)
-    assert listify(splitEvery(20, co)) == [range(10)]
+    # last piece must be shorter if n does not evenly divide
+    assert list(splitEvery(5, range(9))) == [[0, 1, 2, 3, 4], [5, 6, 7, 8]]
 
-    co = itertools.islice(itertools.count(), 10)
-    assert listify(splitEvery(10, co)) == [range(10)]
+    # should give same correct results with generators
+    tmp = itertools.islice(itertools.count(), 9)
+    assert list(splitEvery(5, tmp)) == [[0, 1, 2, 3, 4], [5, 6, 7, 8]]
 
-    co = itertools.islice(itertools.count(), 10)
-    assert listify(splitEvery(5, co)) == [range(5), range(5, 10)]
-
-    co = itertools.islice(itertools.count(), 10)
-    assert listify(splitEvery(3, co)) == [range(3), range(3, 6), range(6, 9), [9]]
+    # should work with empty list. 
+    assert list(splitEvery(100, [])) == []
 # TEST_splitEvery()
 
 #------------------------------------------------------------------------------
@@ -212,4 +213,4 @@ def TEST_struct():
     assert abs(bus.repair_rate - 13) < 0.0001
     assert str(bus) == "101 0.025 13.0"
 
-TEST_struct()
+# TEST_struct()

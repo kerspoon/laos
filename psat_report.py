@@ -115,7 +115,7 @@ class PSATreport(object):
             logger.debug("Done Parsing stream")
         except:
             logger.debug("PARSING ERROR")
-            return None
+            return "error-parsing"
 
         return self.acceptable
 
@@ -128,7 +128,6 @@ class PSATreport(object):
         # print("Header : %s" % tokens)
         if len(tokens[0]) == 1:
             print "Power Flow"
-            pass
         elif len(tokens[0]) == 2:
             print "Optimal Power Flow"
         else:
@@ -165,7 +164,6 @@ class PSATreport(object):
     def process_pflow_bus_limit(self, tokens):
         # print("Limit : %s" % tokens)
         self.ensure("limreact" not in tokens, "Reactive Power Limit")
-        pass
 
     def process_lineflow_bus(self, tokens):
         # print("Bus Line Flow : %s" % tokens)
@@ -192,8 +190,6 @@ class PSATreport(object):
 
         if any((tok in tokens) for tok in ["reactfail", "voltfail"]):
             self.acceptable = False
-        
-        pass
 
     #------------------------------------------------------------------------------
     #

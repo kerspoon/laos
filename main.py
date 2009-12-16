@@ -43,6 +43,7 @@ import optparse
 import logging
 import time 
 import subprocess
+import StringIO
 from parselog import SimInLimits
 from psat import write_scenario, SimulationBatch, NetworkData
 from misc import *
@@ -71,24 +72,66 @@ def remove_files(title):
     grem(".", "solve_" + title + "\.m")
     grem(".", "psat_" + title + "\.m")
 
-def make_matlab_script(stream, title, simtype):
+def make_matlab_script(matlab_file, scenario_group):
+    str_setup = """
+initpsat;
+Settings.lfmit = 50;
+Settings.violations = 'on'
+OPF.basepg = 0;
+OPF.basepl = 0;
+"""
 
-    if simtype == "pf":
-        base_file = "pf_solve.m"
-    elif simtype == "opf":
-        base_file = "opf_solve.m"
-    else:
-        raise Exception()
+    matlab_file.write(str_setup)
 
-    new_text = open(base_file).read().replace('psatfilename', "psat_" + title)
-    stream.write(new_text)
-    #todo: do i need to close these files? 
+    assert len(scenario_group) != 0
+
+    for scenario in scenario_group:
+        filename = "psat_" + scenario.title + ".m"
+        matlab_file.write("runpsat('" + filename + "','data');\n")
+        if scenario.simtype == "pf":
+            matlab_file.write("runpsat pf;\n")
+        elif scenario.simtype == "opf":
+            matlab_file.write("runpsat pf;\n")
+            matlab_file.write("runpsat opf;\n")
+        else:
+            raise Exception("expected pf or opf got: " + scenario.simtype)
+        matlab_file.write("runpsat pfrep;\n")
+        
+    str_teardown = """closepsat;
+exit
+"""
+    matlab_file.write(str_teardown)
+
+def TEST_make_matlab_script():
+    fakefile = StringIO.StringIO()
+    class MockScenario:
+        pass 
+    fakescenario = MockScenario()
+    fakescenario.title = "title"
+    fakescenario.simtype = "pf"
+    make_matlab_script(fakefile, [fakescenario])
+
+    text = fakefile.getvalue()
+    # print text 
+    assert text == """
+initpsat;
+Settings.lfmit = 50;
+Settings.violations = 'on'
+OPF.basepg = 0;
+OPF.basepl = 0;
+runpsat('psat_title.m','data');
+runpsat pf;
+runpsat pfrep;
+closepsat;
+exit
+"""
+TEST_make_matlab_script()
 
 def simulate(title):
 
     print "simulate 'solve_" + title + "'"
 
-    proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r solve_' + title,
+    proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r ' + title,
                             shell=True,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
@@ -115,7 +158,7 @@ def parselog(title, simtype):
  
 def main2(psat_file, batch_file, outfile):
 
-    split_value = 100
+    split_value = 5
 
     network = NetworkData()
     network.read(psat_file)
@@ -140,10 +183,9 @@ def main2(psat_file, batch_file, outfile):
 
         for scenario in scenario_group:
             scenario.result = parselog(scenario.title, scenario.simtype)
-
-        print "RESULT:", scenario.result
-        scenario.write(outfile)
-        outfile.flush()
+            print "RESULT:", scenario.result
+            scenario.write(outfile)
+            outfile.flush()
 
 #------------------------------------------------------------------------------
 # "main" function:

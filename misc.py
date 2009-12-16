@@ -31,6 +31,7 @@ import sys
 import os
 import re 
 import logging
+import itertools
 
 #------------------------------------------------------------------------------
 # Logging:
@@ -66,6 +67,39 @@ def test_grem():
     grem(".", ".*\.pyc", True)
     grem(".", "rts_[1234567890]{2}\.txt", True)
 # test_grem()        
+
+
+#------------------------------------------------------------------------------
+# splitEvery
+#------------------------------------------------------------------------------
+
+def splitEvery(n, it):
+    """
+    splitEvery :: Int -> [e] -> [[e]]
+    @'splitEvery' n@ splits a list into length-n pieces.  The last
+    piece will be shorter if @n@ does not evenly divide the length of
+    the list.
+    """
+    res = list(itertools.islice(it, n))
+    while len(res) != 0:
+        yield res
+        res = list(itertools.islice(it, n))
+
+def TEST_splitEvery():
+    listify = lambda y: [list(x) for x in list(y)]
+
+    co = itertools.islice(itertools.count(), 10)
+    assert listify(splitEvery(20, co)) == [range(10)]
+
+    co = itertools.islice(itertools.count(), 10)
+    assert listify(splitEvery(10, co)) == [range(10)]
+
+    co = itertools.islice(itertools.count(), 10)
+    assert listify(splitEvery(5, co)) == [range(5), range(5, 10)]
+
+    co = itertools.islice(itertools.count(), 10)
+    assert listify(splitEvery(3, co)) == [range(3), range(3, 6), range(6, 9), [9]]
+# TEST_splitEvery()
 
 #------------------------------------------------------------------------------
 #  as_csv :: [T], str -> str

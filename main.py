@@ -23,6 +23,15 @@ James Brooks (kerspoon)
 
 Simulate all contingencies in the batch file using the psat file as a 
 base. Process the results and output.
+
+clean_files :: None -> None
+read_network :: Str -> NetworkData
+read_batch :: Str -> SimulationBatch
+write_matlab_script :: [Scenario], Stream -> None
+write_scenario :: Scenario, Stream -> None
+simulate_matlab_script :: Str -> None
+parse_log :: Scenario, Stream -> Bool
+
 """
  
 #------------------------------------------------------------------------------
@@ -50,6 +59,12 @@ logger = logging.getLogger(__name__)
 #------------------------------------------------------------------------------
 # 
 #------------------------------------------------------------------------------
+
+def clean_files():
+    grem(".", "psat_.*\.m")
+    grem(".", "psat_.*\.txt")
+    grem(".", "solve_.*\.m")
+    grem(".", ".*\.pyc")
 
 def remove_files(title):
     grem(".", title + "_[1234567890]{2}\.txt")
@@ -100,28 +115,31 @@ def parselog(title, simtype):
  
 def main2(psat_file, batch_file, outfile):
 
+    split_value = 100
+
     network = NetworkData()
     network.read(psat_file)
 
     batch = SimulationBatch()
     batch.read(batch_file)
 
-    for scenario in batch:
-        print scenario.simtype
+    clean_files()
 
-        remove_files(scenario.title)
+    for n, scenario_group in enumerate(splitEvery(split_value, batch)):
 
-        matlab_file = open("solve_" + scenario.title + ".m","w")
-        make_matlab_script(matlab_file, scenario.title, scenario.simtype)
+        matlab_file = open("matlab_" + str(n) + ".m","w")
+        make_matlab_script(matlab_file, scenario_group)
         matlab_file.close()
+        
+        for scenario in scenario_group:
+            scenario_file = open("psat_" + scenario.title + ".m","w")
+            write_scenario(scenario_file, scenario, network)
+            scenario_file.close()
 
-        scenario_file = open("psat_" + scenario.title + ".m","w")
-        write_scenario(scenario_file, scenario, network)
-        scenario_file.close()
+        simulate("matlab_" + str(n))
 
-        simulate(scenario.title)
-
-        scenario.result = parselog(scenario.title, scenario.simtype)
+        for scenario in scenario_group:
+            scenario.result = parselog(scenario.title, scenario.simtype)
 
         print "RESULT:", scenario.result
         scenario.write(outfile)

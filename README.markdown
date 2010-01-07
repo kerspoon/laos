@@ -1,8 +1,10 @@
-
 LAOS
 ====
 
 A program to look at the security of the IEEE RTS 96 using PSAT in Matlab. Python is used to generate the files to test. 
+
+Files
+=====
 
 batch.py 
 --------
@@ -29,6 +31,122 @@ misc.py
 
 A few utilities.
 
+Classes
+=======
+
+    class NetworkData
+      """
+      matlab psat data file used in simulations.
+      components can be removed to create specific scenarios though
+      the recommended way is through the 'write_scenario' func.
+      """
+      func read             :: istream(psatfile) -> 
+      func write            :: ostream(psatfile) ->
+      func remove_bus       :: int(>0) ->
+      func remove_line      :: int(>0), int(>0), Either(None, int(>0)) -> 
+      func remove_generator :: int(>0), Either(None, int(>0)) -> 
+      func set_all_supply   :: real(>0) -> 
+      func set_all_demand   :: real(>0) -> 
+      func set_supply       :: int(>0), real(>0) -> 
+      func set_demand       :: int(>0), real(>0) -> 
+      class Bus
+      class Line
+      class Slack
+      class Generator
+      class Load
+      class Shunt 
+      class Demand 
+      class Supply
+    
+
+    class NetworkProbability
+      """
+      the Monte Carlo sampler, it creates
+      scenarios from a network probability data file. 
+      """
+      func read     :: istream(netfile) -> 
+      func write    :: ostream(netfile) ->
+      func outages  :: str -> Scenario
+      func failures :: str -> Scenario
+      class Bus
+      class Generator
+      class Line
+      class Crow
+      
+    class SimulationBatch
+      """
+      manager for a set of Scenario instances, called a batch file.
+      Scenario are a structure for holding changes to a network
+      such as the loss of a components or change in power.
+      """
+      func read     :: istream(batchfile) -> 
+      func write    :: ostream(batchfile) ->
+      func __iter__ :: -> iter(Scenario)
+      class Scenario
+
+    func write_scenario :: ostream, Scenario, NetworkData -> 
+    """
+    take a Scenario and NetworkData, combine to make a 
+    new NetworkData which gets written to a ostream.
+    """
+
+File Types
+==========
+
+PSATFile
+--------
+
+Defined in Link 6 (PSAT). 
+
+    Bus.con = [ ... 
+      1   138  1  0  2  1;
+      24  230  1  0  2  1;
+     ];
+     
+    Line.con = [ ... 
+     1   2   100  138  60  0  0   0.0026  0.0139  0.4611 0     0 1.93 0 2    1;
+     ];
+
+NetFile
+-------
+
+component probabilities. 
+
+    bus 1 0.025 13 
+    bus 2 0.025 13 
+    line A1     1  2 .24    16  0.0
+    line A2     1  3 .51    10  2.9
+    generator G1  1 450   50    U20               
+    generator G2  1 450   50    U20           
+    crow A12-1 A13-2 0.075
+    crow A13-2 A12-1 0.075
+    crow A18   A20   0.075
+
+BatchFile
+---------
+
+    [failure32] pf
+      remove generator 13
+      set all supply 0.86
+    [outage0] opf
+      remove generator 23
+    [outage1] opf
+      remove generator 1
+      remove generator 13
+      remove generator 22
+
+Testing Batch.py
+================
+
+The idea is to run it many times and see if the results match the input probabilities.
+
+    /home/james/laos $ python batch.py -o rts.batch -i 100000 rts.net
+    /home/james/laos $ sort test.batch | grep -v '^\[' | uniq -c > test_res.batch
+
+Running 
+
+    /home/james/laos $ python batch.py -t failures -o rts.batch -i 100000 rts.net
+    /home/james/laos $ python main.py rts.m rts.batch -o rts.res
 
 Links
 =====
@@ -62,70 +180,3 @@ To Try
  - OPF.report % not sure but should be checked out
  - clpsat.refresh = 0 % don't bother re-running the PF
  - clpsat.showopf % not sure
-
-Classes
-=======
-
-    class NetworkData
-      """
-      matlab psat data file used in simulations.
-      components can be removed to create specific scenarios though
-      the recommended way is through the 'write_scenario' func.
-      """
-      func read             :: istream(psatfile) -> 
-      func write            :: ostream(psatfile) ->
-      func remove_bus       :: int(>0) ->
-      func remove_line      :: int(>0), int(>0), Either(None, int(>0)) -> 
-      func remove_generator :: int(>0), Either(None, int(>0)) -> 
-      class Bus
-      class Line
-      class Slack
-      class Generator
-      class Load
-      class Shunt 
-      class Demand 
-      class Supply
-    
-    class NetworkProbability
-      """
-      the Monte Carlo sampler, it creates
-      scenarios from a network probability data file. 
-      """
-      func read     :: istream(netfile) -> 
-      func write    :: ostream(netfile) ->
-      func outages  :: str -> Scenario
-      func failures :: str -> Scenario
-      class Bus
-      class Generator
-      class Line
-      class Crow
-      
-    class SimulationBatch
-      """
-      manager for a set of Scenario instances, called a batch file.
-      Scenario are a structure for holding changes to a network
-      such as the loss of a components or change in power.
-      """
-      func read     :: istream(netfile) -> 
-      func write    :: ostream(netfile) ->
-      func __iter__ :: -> iter(Scenario)
-      class Scenario
-
-    func write_scenario :: ostream, Scenario, NetworkData -> 
-    """
-    take a Scenario and NetworkData, combine to make a 
-    new NetworkData which gets written to a ostream.
-    """
-
-Testing Batch.py
-================
-
-The idea is to run it many times and see if the results match the input probabilities.
-
-    /home/james/laos $ python batch.py -o rts.batch -i 100000 rts.net
-    /home/james/laos $ sort test.batch | grep -v '^\[' | uniq -c > test_res.batch
-
-Running 
-
-    /home/james/laos $ python batch.py -t failures -o rts.batch -i 100000 rts.net
-    /home/james/laos $ python main.py rts.m rts.batch -o rts.res

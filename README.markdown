@@ -66,24 +66,56 @@ To Try
 Classes
 =======
 
-    NetworkData
-      Bus
-      Line
-      Slack
-      Generator
-      Load
-      Shunt 
-      Demand 
-      Supply
+    class NetworkData
+      """
+      matlab psat data file used in simulations.
+      components can be removed to create specific scenarios though
+      the recommended way is through the 'write_scenario' func.
+      """
+      func read             :: istream(psatfile) -> 
+      func write            :: ostream(psatfile) ->
+      func remove_bus       :: int(>0) ->
+      func remove_line      :: int(>0), int(>0), Either(None, int(>0)) -> 
+      func remove_generator :: int(>0), Either(None, int(>0)) -> 
+      class Bus
+      class Line
+      class Slack
+      class Generator
+      class Load
+      class Shunt 
+      class Demand 
+      class Supply
     
-    NetworkProbability
-      Bus
-      Generator
-      Line
-      Crow
-    
-    SimulationBatch
-      Scenario
+    class NetworkProbability
+      """
+      the Monte Carlo sampler, it creates
+      scenarios from a network probability data file. 
+      """
+      func read     :: istream(netfile) -> 
+      func write    :: ostream(netfile) ->
+      func outages  :: str -> Scenario
+      func failures :: str -> Scenario
+      class Bus
+      class Generator
+      class Line
+      class Crow
+      
+    class SimulationBatch
+      """
+      manager for a set of Scenario instances, called a batch file.
+      Scenario are a structure for holding changes to a network
+      such as the loss of a components or change in power.
+      """
+      func read     :: istream(netfile) -> 
+      func write    :: ostream(netfile) ->
+      func __iter__ :: -> iter(Scenario)
+      class Scenario
+
+    func write_scenario :: ostream, Scenario, NetworkData -> 
+    """
+    take a Scenario and NetworkData, combine to make a 
+    new NetworkData which gets written to a ostream.
+    """
 
 Testing Batch.py
 ================
@@ -93,7 +125,7 @@ The idea is to run it many times and see if the results match the input probabil
     /home/james/laos $ python batch.py -o rts.batch -i 100000 rts.net
     /home/james/laos $ sort test.batch | grep -v '^\[' | uniq -c > test_res.batch
 
-Runing 
+Running 
 
     /home/james/laos $ python batch.py -t failures -o rts.batch -i 100000 rts.net
     /home/james/laos $ python main.py rts.m rts.batch -o rts.res

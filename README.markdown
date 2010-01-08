@@ -6,30 +6,15 @@ A program to look at the security of the IEEE RTS 96 using PSAT in Matlab. Pytho
 Files
 =====
 
-batch.py 
---------
+ * **batch.py** This creates batch files from a Monte Carlo sample of failure probabilities. It can either show outages or failures within the next 1h period. The batch files say which components have changed power input/output and which are on outage / failed.  
 
-This creates batch files from a Monte Carlo sample of failure probabilities. It can either show outages or failures within the next 1h period. The batch files say which components have changed power input/output and which are on outage / failed.  
+ * **main.py** This takes a batch file and a PSAT data file and runs each scenario in Matlab/PSAT using the data file as a base. The results are stored as another batch file where each scenario has the results of pass or fail appended.
 
-main.py
--------
+ * **psat.py** Almost everything is in here. It should be separated. 
 
-This takes a batch file and a PSAT data file and runs each scenario in Matlab/PSAT using the data file as a base. The results are stored as another batch file where each scenario has the results of pass or fail appended.
+ * **parselog.py** This takes the report from a Matlab/PSAT loadflow and converts it into a pass/fail result.
 
-psat.py
--------
-
-Almost everything is in here. It should be separated. 
-
-parselog.py
------------
-
-This takes the report from a Matlab/PSAT loadflow and converts it into a pass/fail result. It's currently very buggy.
-
-misc.py
--------
-
-A few utilities.
+ * **misc.py** A few utilities.
 
 Classes
 =======
@@ -58,7 +43,6 @@ Classes
       class Demand 
       class Supply
     
-
     class NetworkProbability
       """
       the Monte Carlo sampler, it creates

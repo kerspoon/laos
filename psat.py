@@ -27,6 +27,7 @@ from copy import deepcopy
 from misc import *
 import math
 import random
+import buslevel
 
 #------------------------------------------------------------------------------
 #  Logging:
@@ -218,6 +219,8 @@ class NetworkProbability(object):
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pfail)]
         scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
+        # NOTE:: 1.0 should be the value of forcast load which will always
+        #        be lower than 1, but it shouldn't make too much difference. 
         scen.all_demand = buslevel.actual_load2(1.0)
         return scen
 
@@ -417,13 +420,16 @@ class NetworkData(object):
             raise Exception("can't happen")
 
     def set_all_supply(self, value):
+        # can't set this simply it depends on the bid price.
         raise Exception("not implemented")
          
     def set_all_demand(self, value):
-        
-        raise Exception("not implemented")
+        for load in self.loads:
+            # Note:: should I change P, Q or both. 
+            load.p *= value
 
     def set_supply(self, bus_no, value):
+        # can't set this simply it depends on the bid price.
         raise Exception("not implemented")
          
     def set_demand(self, bus_no, value):
@@ -462,7 +468,7 @@ class Scenario(object):
         for item in self.demand.items():
             stream.write("  set demand " + as_csv(item, " ") + "\n")
         if self.result != None: # damn python's multiple true values
-            if self.result == True:
+            if self.result:
                 stream.write("  result pass\n")
             else:
                 stream.write("  result fail\n")
@@ -595,7 +601,10 @@ def write_scenario(stream, scenario, network):
         newpsat.remove_line(kill[0], kill[1])
     for kill in scenario.kill["generator"]:
         newpsat.remove_generator(kill)
-
+    if scenario.all_supply:
+        newpsat.set_all_supply(scenario.all_supply)
+    if scenario.all_demand:
+        newpsat.set_all_demand(scenario.all_demand)
     if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
         raise Exception("not implemented")
     

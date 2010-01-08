@@ -209,10 +209,17 @@ def test():
 
 def test2():
     """
-    
+    optimal power flow the system with half load power 
     """
 
     from psat import Scenario
+    from psat_report import PSATreport
+
+    grem(".", ".*\.pyc")
+    grem(".", ".*\.pyc")
+    grem(".", r"psatfile.*\.txt")
+    grem(".", r"psatfile.*\.m")
+    grem(".", r"matlabfile.*\.m")
 
     # read the base psatfile 
     nd = NetworkData()
@@ -237,7 +244,14 @@ def test2():
     
     # simulate and read result
     simulate("matlabfile_001")
-    sc.result = parselog("psatfile_001", sc.simtype)
+    try:
+        sc.result = PSATreport().parse_stream(open("psatfile_001_01.txt"))
+    except:
+        pass
+
+    # print out the scenario with the result
+    sc.write(sys.stdout)
+
 
 if __name__ == "__main__":
     main()

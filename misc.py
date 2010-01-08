@@ -48,6 +48,10 @@ logger = logging.getLogger(__name__)
 def grem(path, pattern, test=False):
     """remove all folders/files in 'path' thatmatches the 
        regexp 'pattern'. test prints out names only.
+
+       <http://docs.python.org/library/re.html>
+       it’s highly recommended that you use raw strings for 
+       all but the simplest expressions.
     """
     pattern = re.compile(pattern)
     for each in os.listdir(path):
@@ -63,8 +67,8 @@ def grem(path, pattern, test=False):
                 # logger.info("Grem removed dir " + name)
 
 def test_grem():
-    grem(".", ".*\.pyc", True)
-    grem(".", "rts_[1234567890]{2}\.txt", True)
+    grem(".", r".*\.pyc", True)
+    grem(".", r"rts_[1234567890]{2}\.txt", True)
 # test_grem()        
 
 #------------------------------------------------------------------------------

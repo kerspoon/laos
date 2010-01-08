@@ -13,7 +13,6 @@ initpsat;
 Settings.lfmit = 50;       % iteration limit
 Settings.violations = 'on' % check for limits in report
 OPF.basepg = 0;            % ignore base power (as it will be done by bids/offers)
-OPF.basepl = 0;            % ignore load power (as it will be done by bids/offers)
 
 % load file
 runpsat('psatfilename','data');

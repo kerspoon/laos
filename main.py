@@ -158,7 +158,7 @@ def parselog(title, simtype):
  
 def main2(psat_file, batch_file, outfile):
 
-    split_value = 5
+    split_value = 10
 
     network = NetworkData()
     network.read(psat_file)

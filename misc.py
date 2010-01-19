@@ -51,7 +51,7 @@ def grem(path, pattern, test=False):
        regexp 'pattern'. test prints out names only.
 
        <http://docs.python.org/library/re.html>
-       it’s highly recommended that you use raw strings for 
+       it's highly recommended that you use raw strings for 
        all but the simplest expressions.
     """
     pattern = re.compile(pattern)

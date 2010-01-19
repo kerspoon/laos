@@ -62,15 +62,33 @@ logger = logging.getLogger(__name__)
 #------------------------------------------------------------------------------
 
 def clean_files():
-    grem(".", "psat_.*\.m")
-    grem(".", "psat_.*\.txt")
-    grem(".", "solve_.*\.m")
-    grem(".", ".*\.pyc")
+    grem(".", r"psat_.*\.m")
+    grem(".", r"psat_.*\.txt")
+    grem(".", r"solve_.*\.m")
+    grem(".", r".*\.pyc")
 
 def remove_files(title):
     grem(".", title + "_[1234567890]{2}\.txt")
     grem(".", "solve_" + title + "\.m")
     grem(".", "psat_" + title + "\.m")
+
+def basic_matlab_script(matlab_stream, filename, simtype):
+    matlab_stream.write("""
+initpsat;
+Settings.lfmit = 50;
+Settings.violations = 'on'
+OPF.basepg = 0;
+""")
+    matlab_stream.write("runpsat('" + filename + "','data');\n")
+    if simtype == "pf":
+        matlab_stream.write("runpsat pf;\n")
+    elif simtype == "opf":
+        matlab_stream.write("runpsat pf;\n")
+        matlab_stream.write("runpsat opf;\n")
+    else:
+        raise Exception("expected pf or opf got: " + simtype)
+    matlab_stream.write("runpsat pfrep;\n")
+    matlab_stream.write("closepsat;\nexit")
 
 def make_matlab_script(matlab_file, scenario_group):
     str_setup = """
@@ -273,8 +291,7 @@ def test2():
     from psat import Scenario
     from psat_report import PSATreport
 
-    grem(".", ".*\.pyc")
-    grem(".", ".*\.pyc")
+    grem(".", r".*\.pyc")
     grem(".", r"psatfile.*\.txt")
     grem(".", r"psatfile.*\.m")
     grem(".", r"matlabfile.*\.m")
@@ -292,12 +309,9 @@ def test2():
     write_scenario(scenario_file, sc, nd)
     scenario_file.close()
 
-    # create the matlab script based on other file
-    base_file = open("opf_solve.m")
-    new_text = base_file.read().replace('psatfilename', "psatfile_001")
-    base_file.close()
+    # create the matlab script
     matlab_script = open("matlabfile_001.m","w")
-    matlab_script.write(new_text)
+    basic_matlab_script(matlab_script, "psatfile_001.m", "pf")
     matlab_script.close()
     
     # simulate and read result
@@ -310,9 +324,39 @@ def test2():
     # print out the scenario with the result
     sc.write(sys.stdout)
 
+def test3():
+    
+    from psat_report import generate_scenario
+
+    grem(".", r".*\.pyc")
+    grem(".", r"rts.*\.txt")
+    grem(".", r"matlabfile.*\.m")
+
+    # read the base psatfile 
+    psat_data = NetworkData()
+    psat_data.read(open("rts.m"))
+
+    # create the matlab script
+    matlab_script = open("matlabfile.m","w")
+    basic_matlab_script(matlab_script, "rts.m", "opf")
+    matlab_script.close()
+    
+    # simulate
+    simulate("matlabfile")
+
+    # generate new psat class instance
+    report_stream = open("rts_01.txt")
+    new_psat = generate_scenario(report_stream, psat_data)
+    report_stream.close()
+
+    # write the new file to disk
+    new_file = open("rts_02.m")
+    new_psat.write(new_file)
+    new_file.close()
 
 if __name__ == "__main__":
-    main()
+    test3()
+    # main()
  
  
 # EOF -------------------------------------------------------------------------

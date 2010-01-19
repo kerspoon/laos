@@ -96,6 +96,5 @@ stringtolits = lambda x: And([Literal(y) for y in x.split()])
 # a space seperated line of decimal values that have a column name
 decimaltable = lambda x: And([decimal.setResultsName(y) for y in x])
 
-busname = Or([Literal("Bus") + integer, Word(alphanums + "-_")])
 
 slit = lambda x: Suppress(Literal(x))

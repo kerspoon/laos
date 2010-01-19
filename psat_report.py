@@ -33,6 +33,7 @@ from parsingutil import *
 from decimal import Decimal
 import logging
 import sys
+from copy import deepcopy
 
 #------------------------------------------------------------------------------
 # Logging:
@@ -53,6 +54,8 @@ def dec_check(val, vmin=Decimal("-1.0"), vmax=Decimal("1.0")):
 def almost_equal(x, y):
     return abs(Decimal(x) - Decimal(y)) < Decimal("0.001")
 
+busname = Literal("Bus").suppress() + integer
+
 #------------------------------------------------------------------------------
 # PSATreport:
 #------------------------------------------------------------------------------
@@ -65,26 +68,26 @@ class PSATreport(object):
         """Bus Bar power flow"""
 
         def __init__(self, name, v, phase, pg, qg, pl, ql):
-            self._name = name
-            self._v = v
-            self._phase = phase
-            self._pg = pg
-            self._qg = qg
-            self._pl = pl
-            self._ql = ql
+            self.name = name
+            self.v = v
+            self.phase = phase
+            self.pg = pg
+            self.qg = qg
+            self.pl = pl
+            self.ql = ql
 
     class LineFlow(object):
         """line flow results
         """
 
         def __init__(self, fbus, tbus, line, pf, qf, pl, ql):
-            self._fbus = fbus
-            self._tbus = tbus
-            self._line = line
-            self._pf = pf
-            self._qf = qf
-            self._pl = pl
-            self._ql = ql
+            self.fbus = fbus
+            self.tbus = tbus
+            self.line = line
+            self.pf = pf
+            self.qf = qf
+            self.pl = pl
+            self.ql = ql
 
     def __init__(self):
         self.num_bus = None
@@ -151,6 +154,10 @@ class PSATreport(object):
         self.num_bus = tokens[0]["buses"]
         self.power_rate = tokens[1]["rate"]
 
+        # set length only (line flows are there and back)
+        self.power_flow = [None for _ in range(self.num_bus)]
+        self.line_flow = [None for _ in range(self.num_line * 2)]
+
     def process_pflow_bus(self, tokens):
         # print("Bus Power Flow : %s" % tokens)
         # print tokens["bus"]
@@ -159,6 +166,21 @@ class PSATreport(object):
         for x in "v pg qg pl ql".split():
             self.ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
         self.ensure(dec_check(tokens["phase"],"-1.0","1.0"), "error : \n%s" % tokens)
+
+        # actually add to self.power_flow
+        # are we to assume that there is a 1-to-1 mapping of names to the natural numbers
+        # if not then we need a very gay lookup, if so then ... woo 
+        # im going to assume they are sequential.
+
+        bus_num = tokens["bus"][0]
+        self.power_flow[bus_num] = self.PowerFlow(
+            bus_num,
+            tokens["v"],
+            tokens["phase"],
+            tokens["pg"],
+            tokens["qg"],
+            tokens["pl"],
+            tokens["ql"])
 
     def process_pflow_bus_limit(self, tokens):
         # print("Limit : %s" % tokens)
@@ -173,6 +195,9 @@ class PSATreport(object):
         for x in "pf qf pl ql".split():
             self.ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
         self.ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
+
+        # TODO: I don't actually add anything to self.line_flow
+        # fbus, tbus, line, pf, qf, pl, ql
 
     def process_summary(self, tokens):
         # print("Summary : %s" % tokens)
@@ -316,4 +341,48 @@ class PSATreport(object):
 
 # PSATreport().parse_stream(open("psat_01.txt"))
 
+def zeros(length):
+    """an array of given length where each item is zero"""
+    return [0 for _ in range(length)]
 
+# take a psat report file and a psat file
+# combine to make a new psat file that has the following set. 
+#
+# SW.con
+#   3. V0      -- power_flow[slackbusnum]._v
+#   4. theta0  -- power_flow[slackbusnum]._phase
+#   9. Pg0     -- ???  power_flow[slackbusnum]._pg
+#
+# pv.con
+#   Pg         -- power_flow[busnum]._pg
+#   V0         -- power_flow[busnum]._v
+#
+# PQ.con
+#   Pl         -- power_flow[busnum]._pl
+#   Ql         -- power_flow[busnum]._ql
+# 
+
+def generate_scenario(report_stream, psat_data):
+
+    new_psat = deepcopy(psat_data)
+
+    report = PSATreport()
+    report.parse_stream(report_stream)
+    pf = report.power_flow
+
+    slack = new_psat.slack[0]
+    slack.v_magnitude = pf[slack.bus_no]._v
+    slack.ref_angle = pf[slack.bus_no]._phase
+    # slack.p_guess = pf[slack.bus_no]._pg
+
+    for gen in new_psat.generators:
+        assert pf[gen.bus_no] != None
+        gen.p = pf[gen.bus_no]._pg
+        gen.v = pf[gen.bus_no]._v
+
+    for load in new_psat.loads:
+        assert pf[load.bus_no] != None
+        load.p = pf[load.bus_no]._pg
+        load.q = pf[load.bus_no]._q
+
+    return new_psat

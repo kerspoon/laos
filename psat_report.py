@@ -115,8 +115,7 @@ class PSATreport(object):
             logger.debug("Done Parsing stream")
         except:
             logger.debug("PARSING ERROR")
-            return "error-parsing"
-
+            raise
         return self.acceptable
 
     def ensure(self, cond, text):

@@ -78,7 +78,6 @@ initpsat;
 Settings.lfmit = 50;
 Settings.violations = 'on'
 OPF.basepg = 0;
-OPF.basepl = 0;
 """
 
     matlab_file.write(str_setup)
@@ -118,7 +117,6 @@ initpsat;
 Settings.lfmit = 50;
 Settings.violations = 'on'
 OPF.basepg = 0;
-OPF.basepl = 0;
 runpsat('psat_title.m','data');
 runpsat pf;
 runpsat pfrep;
@@ -129,7 +127,7 @@ TEST_make_matlab_script()
 
 def simulate(title):
 
-    print "simulate 'solve_" + title + "'"
+    print "simulate '" + title + "'"
 
     proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r ' + title,
                             shell=True,
@@ -244,9 +242,78 @@ def main():
     elapsed = time.time() - t0
     logger.info("Completed in %.3fs." % elapsed)
 
+def test():
+    """
+    create 100 outage samples then saves to a batchfile. 
+    then read them back in, and write once more. 
+    The files should be the same (though this isn't auto-checked)
+    """
+    import psat 
+    np = psat.NetworkProbability()
+    np.read(open("rts.net"))
+
+    ofile = open("rts.bch","w")
+    for x in range(100):
+        np.outages(str(x)).write(ofile)
+    ofile.close()
+
+    sb = psat.SimulationBatch()
+    sb.read(open("rts.bch"))
+    assert len(list(iter(sb))) == 100
+
+    f2 = open("test.bch","w")
+    sb.write(f2)
+    f2.close()
+
+def test2():
+    """
+    optimal power flow the system with half load power 
+    """
+
+    from psat import Scenario
+    from psat_report import PSATreport
+
+    grem(".", ".*\.pyc")
+    grem(".", ".*\.pyc")
+    grem(".", r"psatfile.*\.txt")
+    grem(".", r"psatfile.*\.m")
+    grem(".", r"matlabfile.*\.m")
+
+    # read the base psatfile 
+    nd = NetworkData()
+    nd.read(open("rts.m"))
+
+    # make a scenario 
+    sc = Scenario("001", "opf")
+    sc.all_demand = 0.5
+
+    # combine to make a new psatfile
+    scenario_file = open("psatfile_001.m","w")
+    write_scenario(scenario_file, sc, nd)
+    scenario_file.close()
+
+    # create the matlab script based on other file
+    base_file = open("opf_solve.m")
+    new_text = base_file.read().replace('psatfilename', "psatfile_001")
+    base_file.close()
+    matlab_script = open("matlabfile_001.m","w")
+    matlab_script.write(new_text)
+    matlab_script.close()
+    
+    # simulate and read result
+    simulate("matlabfile_001")
+    try:
+        sc.result = PSATreport().parse_stream(open("psatfile_001_01.txt"))
+    except:
+        pass
+
+    # print out the scenario with the result
+    sc.write(sys.stdout)
+
+
 if __name__ == "__main__":
     main()
  
  
 # EOF -------------------------------------------------------------------------
- 
+

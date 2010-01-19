@@ -17,7 +17,6 @@
 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 #------------------------------------------------------------------------------
 
-
 #------------------------------------------------------------------------------
 #  Imports:
 #------------------------------------------------------------------------------
@@ -28,6 +27,7 @@ from copy import deepcopy
 from misc import *
 import math
 import random
+import buslevel
 
 #------------------------------------------------------------------------------
 #  Logging:
@@ -201,7 +201,6 @@ class NetworkProbability(object):
         return crowfails
 
     def outages(self, name):
-
         scen = Scenario("outage" + name, "opf")
         scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pout)]
         scen.kill["line"] = [(line.fbus, line.tbus) for line in 
@@ -209,11 +208,10 @@ class NetworkProbability(object):
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pout)]
         scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
-
+        scen.all_demand = buslevel.random_bus_forecast()
         return scen
 
     def failures(self, name):
-        
         scen = Scenario("failure" + name, "pf")
         scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pfail)]
         scen.kill["line"] = [(line.fbus, line.tbus) for line in 
@@ -221,7 +219,9 @@ class NetworkProbability(object):
         scen.kill["generator"] = [generator.bus_id for generator in 
                                   self.generators if fail(generator.pfail)]
         scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
-
+        # NOTE:: 1.0 should be the value of forcast load which will always
+        #        be lower than 1, but it shouldn't make too much difference. 
+        scen.all_demand = buslevel.actual_load2(1.0)
         return scen
 
 #------------------------------------------------------------------------------
@@ -419,6 +419,22 @@ class NetworkData(object):
         else:
             raise Exception("can't happen")
 
+    def set_all_supply(self, value):
+        # can't set this simply it depends on the bid price.
+        raise Exception("not implemented")
+         
+    def set_all_demand(self, value):
+        for load in self.loads:
+            # Note:: should I change P, Q or both. 
+            load.p *= value
+
+    def set_supply(self, bus_no, value):
+        # can't set this simply it depends on the bid price.
+        raise Exception("not implemented")
+         
+    def set_demand(self, bus_no, value):
+        raise Exception("not implemented")
+
 #------------------------------------------------------------------------------
 #  SimulationBatch:
 #------------------------------------------------------------------------------
@@ -428,6 +444,8 @@ class Scenario(object):
         self.title = title
         self.simtype = simtype
         self.kill = {'bus':[], 'generator':[], 'line':[]}
+        self.all_supply = None 
+        self.all_demand = None
         self.supply = {}
         self.demand = {}
         self.result = None
@@ -441,13 +459,16 @@ class Scenario(object):
             stream.write("  remove line " + as_csv(kill, " ") + "\n")
         for kill in self.kill["generator"]:
             stream.write("  remove generator " + str(kill) + "\n")
+        if self.all_supply:
+            stream.write("  set all supply " + str(self.all_supply) + "\n")
+        if self.all_demand:
+            stream.write("  set all demand " + str(self.all_demand) + "\n")
         for item in self.supply.items():
             stream.write("  set supply " + as_csv(item, " ") + "\n")
         for item in self.demand.items():
             stream.write("  set demand " + as_csv(item, " ") + "\n")
-        
         if self.result != None: # damn python's multiple true values
-            if self.result == True:
+            if self.result:
                 stream.write("  result pass\n")
             elif self.result == False:
                 stream.write("  result fail\n")
@@ -492,6 +513,12 @@ class SimulationBatch(object):
             self.scenarios[-1].demand[bus_no] = value
             # logger.debug("Set demand: bus[%s]=%f" % (bus_no, value))
 
+        def set_all_demand(value):
+            self.scenarios[-1].all_demand = value
+
+        def set_all_supply(value):
+            self.scenarios[-1].all_supply = value
+
         for line in stream:
 
             line = [x.lower() for x in line.split()]
@@ -533,10 +560,16 @@ class SimulationBatch(object):
                     bus_no = int(line[2])
                     value = float(line[3])
                     set_demand(bus_no, value)
+                elif line[1:3] == ["all","supply"]:
+                    value = float(line[3])
+                    set_all_supply(value)
+                elif line[1:3] == ["all","demand"]:
+                    value = float(line[3])
+                    set_all_demand(value)
                 else:
-                    raise Exception("got %s expected (supply, demand)" % line[1])
+                    raise Exception("got %s expected (all?, supply, demand)" % line[1])
            
-            # ignore results 
+            # results 
             elif line[0] == "result":
                 if line[1] == "pass":
                     self.scenarios[-1].result = True
@@ -570,7 +603,10 @@ def write_scenario(stream, scenario, network):
         newpsat.remove_line(kill[0], kill[1])
     for kill in scenario.kill["generator"]:
         newpsat.remove_generator(kill)
-
+    if scenario.all_supply:
+        newpsat.set_all_supply(scenario.all_supply)
+    if scenario.all_demand:
+        newpsat.set_all_demand(scenario.all_demand)
     if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
         raise Exception("not implemented")
     

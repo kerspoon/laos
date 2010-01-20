@@ -1,6 +1,5 @@
 #! /usr/local/bin/python
 # parse a psat report
-# psat_report.PSATreport.parse_stream(open("psat_outage0_01.txt"))
 
 #------------------------------------------------------------------------------
 # Copyright (C) 2009 James Brooks (kerspoon)
@@ -339,11 +338,10 @@ class PSATreport(object):
 #
 #------------------------------------------------------------------------------
 
-# PSATreport().parse_stream(open("psat_01.txt"))
-
-def zeros(length):
-    """an array of given length where each item is zero"""
-    return [0 for _ in range(length)]
+# report_in_limits(open("psat_01.txt"))
+def report_in_limits(report_stream):
+    report = PSATreport()
+    return report.parse_stream(report_stream)
 
 # take a psat report file and a psat file
 # combine to make a new psat file that has the following set. 

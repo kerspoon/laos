@@ -44,10 +44,10 @@ import logging
 import time 
 import subprocess
 import StringIO
-from parselog import SimInLimits
 from psat import write_scenario, SimulationBatch, NetworkData
+from psat_report import generate_scenario, report_in_limits
 from misc import *
- 
+
 #------------------------------------------------------------------------------
 # Logging:
 #------------------------------------------------------------------------------
@@ -165,9 +165,6 @@ def simulate(title):
     # print so 
     # print "================================="
 
-def parselog(title, simtype):
-    return SimInLimits(open("psat_" + title + "_01.txt"), simtype)
- 
 #------------------------------------------------------------------------------
 # "main2" function:
 #------------------------------------------------------------------------------
@@ -198,7 +195,7 @@ def main2(psat_file, batch_file, outfile):
         simulate("matlab_" + str(n))
 
         for scenario in scenario_group:
-            scenario.result = parselog(scenario.title, scenario.simtype)
+            scenario.result = report_in_limits(open("psat_" + scenario.title + "_01.txt"))
             print "RESULT:", scenario.result
             scenario.write(outfile)
             outfile.flush()
@@ -289,7 +286,6 @@ def test2():
     """
 
     from psat import Scenario
-    from psat_report import PSATreport
 
     grem(".", r".*\.pyc")
     grem(".", r"psatfile.*\.txt")
@@ -317,7 +313,7 @@ def test2():
     # simulate and read result
     simulate("matlabfile_001")
     try:
-        sc.result = PSATreport().parse_stream(open("psatfile_001_01.txt"))
+        sc.result = report_in_limits(open("psatfile_001_01.txt"))
     except:
         pass
 
@@ -325,8 +321,6 @@ def test2():
     sc.write(sys.stdout)
 
 def test3():
-    
-    from psat_report import generate_scenario
 
     grem(".", r".*\.pyc")
     grem(".", r"rts.*\.txt")

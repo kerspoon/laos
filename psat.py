@@ -419,21 +419,22 @@ class NetworkData(object):
         else:
             raise Exception("can't happen")
 
-    def set_all_supply(self, value):
-        # can't set this simply it depends on the bid price.
-        raise Exception("not implemented")
-         
     def set_all_demand(self, value):
         for load in self.loads:
             # Note:: should I change P, Q or both. 
             load.p *= value
 
-    def set_supply(self, bus_no, value):
-        # can't set this simply it depends on the bid price.
-        raise Exception("not implemented")
+#     def set_all_supply(self, value):
+#         # can't set this simply it depends on the bid price.
+#         raise Exception("not implemented")
+#  
+#     def set_demand(self, bus_no, value):
+#         raise Exception("not implemented")
+#  
+#     def set_supply(self, bus_no, value):
+#         # can't set this simply it depends on the bid price.
+#         raise Exception("not implemented")
          
-    def set_demand(self, bus_no, value):
-        raise Exception("not implemented")
 
 #------------------------------------------------------------------------------
 #  SimulationBatch:
@@ -470,10 +471,10 @@ class Scenario(object):
         if self.result != None: # damn python's multiple true values
             if self.result:
                 stream.write("  result pass\n")
-            elif self.result == False:
+            elif not self.result:
                 stream.write("  result fail\n")
             else:
-                stream.write(str(self.result) + "\n")
+                stream.write("  result" + str(self.result) + "\n")
 
 class SimulationBatch(object):
     """

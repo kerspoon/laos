@@ -96,8 +96,8 @@ class PSATreport(object):
         self.num_load = None
 
         self.power_rate = None
-        self.power_flow = []
-        self.line_flow = []
+        self.power_flow = {}
+        self.line_flow = {}
 
         self.acceptable = True
 
@@ -153,13 +153,12 @@ class PSATreport(object):
         self.num_bus = tokens[0]["buses"]
         self.power_rate = tokens[1]["rate"]
 
-        # set length only (line flows are there and back)
-        self.power_flow = [None for _ in range(self.num_bus)]
-        self.line_flow = [None for _ in range(self.num_line * 2)]
+        self.power_flow = {}
+        self.line_flow = {}
 
     def process_pflow_bus(self, tokens):
-        # print("Bus Power Flow : %s" % tokens)
-        # print tokens["bus"]
+        # print "Bus Power Flow : %d : %s" % (tokens["bus"][0],tokens)
+        # print tokens["bus"][0]
 
         pu_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
         for x in "v pg qg pl ql".split():
@@ -167,11 +166,24 @@ class PSATreport(object):
         self.ensure(dec_check(tokens["phase"],"-1.0","1.0"), "error : \n%s" % tokens)
 
         # actually add to self.power_flow
+
         # are we to assume that there is a 1-to-1 mapping of names to the natural numbers
         # if not then we need a very gay lookup, if so then ... woo 
-        # im going to assume they are sequential.
+        # im going to assume they do map.
+        # even then, do we then keep the 1 based counting or convert to zero based. 
+        # GAAAAYYYY
+        # if I convert the external file to zero based. it wont then match the journal paper
+        # if I convert the interal representation it wont match the file or paper
+        # if I leave it then there may be strange bugs as there will be a dummy element
+
+        # I have decuded to use a dict rather than a list, it still has integers as the key
+        # it sovles the other problems. only requirement is that they are unique integers. 
 
         bus_num = tokens["bus"][0]
+
+        assert bus_num >= 0
+        assert bus_num not in self.power_flow, "already added, do two bussed have the same num"
+
         self.power_flow[bus_num] = self.PowerFlow(
             bus_num,
             tokens["v"],
@@ -338,10 +350,15 @@ class PSATreport(object):
 #
 #------------------------------------------------------------------------------
 
-# report_in_limits(open("psat_01.txt"))
 def report_in_limits(report_stream):
     report = PSATreport()
     return report.parse_stream(report_stream)
+
+# report_in_limits(open("rts_01.txt"))
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
 
 # take a psat report file and a psat file
 # combine to make a new psat file that has the following set. 
@@ -369,18 +386,19 @@ def generate_scenario(report_stream, psat_data):
     pf = report.power_flow
 
     slack = new_psat.slack[0]
-    slack.v_magnitude = pf[slack.bus_no]._v
-    slack.ref_angle = pf[slack.bus_no]._phase
-    # slack.p_guess = pf[slack.bus_no]._pg
+    slack.v_magnitude = pf[slack.bus_no].v
+    slack.ref_angle = pf[slack.bus_no].phase
+    # slack.p_guess = pf[slack.bus_no].pg
 
     for gen in new_psat.generators:
         assert pf[gen.bus_no] != None
-        gen.p = pf[gen.bus_no]._pg
-        gen.v = pf[gen.bus_no]._v
+        gen.p = pf[gen.bus_no].pg
+        gen.v = pf[gen.bus_no].v
 
     for load in new_psat.loads:
         assert pf[load.bus_no] != None
-        load.p = pf[load.bus_no]._pg
-        load.q = pf[load.bus_no]._q
+        load.p = pf[load.bus_no].pl
+        load.q = pf[load.bus_no].ql
 
     return new_psat
+

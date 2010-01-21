@@ -56,10 +56,10 @@ def almost_equal(x, y):
 busname = Literal("Bus").suppress() + integer
 
 #------------------------------------------------------------------------------
-# PSATreport:
+# PsatReport:
 #------------------------------------------------------------------------------
 
-class PSATreport(object):
+class PsatReport(object):
     """Matlab PSAT report file.
     """
 
@@ -113,7 +113,7 @@ class PSATreport(object):
             limits = self.GetLimits()
 
             case = headers + stats + pflow + lineflow + summary + limits
-            data = case.parseFile(stream)
+            self.data = case.parseFile(stream)
             logger.debug("Done Parsing stream")
         except:
             logger.debug("PARSING ERROR")
@@ -337,50 +337,3 @@ class PSATreport(object):
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
-
-# report_in_limits(open("psat_01.txt"))
-def report_in_limits(report_stream):
-    report = PSATreport()
-    return report.parse_stream(report_stream)
-
-# take a psat report file and a psat file
-# combine to make a new psat file that has the following set. 
-#
-# SW.con
-#   3. V0      -- power_flow[slackbusnum]._v
-#   4. theta0  -- power_flow[slackbusnum]._phase
-#   9. Pg0     -- ???  power_flow[slackbusnum]._pg
-#
-# pv.con
-#   Pg         -- power_flow[busnum]._pg
-#   V0         -- power_flow[busnum]._v
-#
-# PQ.con
-#   Pl         -- power_flow[busnum]._pl
-#   Ql         -- power_flow[busnum]._ql
-# 
-
-def generate_scenario(report_stream, psat_data):
-
-    new_psat = deepcopy(psat_data)
-
-    report = PSATreport()
-    report.parse_stream(report_stream)
-    pf = report.power_flow
-
-    slack = new_psat.slack[0]
-    slack.v_magnitude = pf[slack.bus_no]._v
-    slack.ref_angle = pf[slack.bus_no]._phase
-    # slack.p_guess = pf[slack.bus_no]._pg
-
-    for gen in new_psat.generators:
-        assert pf[gen.bus_no] != None
-        gen.p = pf[gen.bus_no]._pg
-        gen.v = pf[gen.bus_no]._v
-
-    for load in new_psat.loads:
-        assert pf[load.bus_no] != None
-        load.p = pf[load.bus_no]._pg
-        load.q = pf[load.bus_no]._q
-
-    return new_psat

@@ -495,6 +495,9 @@ class SimulationBatch(object):
     def __init__(self):
         self.scenarios = []
 
+    def add(self, scenario):
+        self.scenarios.append(scenario)
+
     def write(self, stream):
         for scenario in self.scenarios:
             scenario.write(stream)

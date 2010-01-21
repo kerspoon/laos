@@ -6,19 +6,32 @@ A program to look at the security of the IEEE RTS 96 using PSAT in Matlab. Pytho
 Files
 =====
 
+ * **script.py** this is where all the main functionality of the program lies
+
  * **batch.py** This creates batch files from a Monte Carlo sample of failure probabilities. It can either show outages or failures within the next 1h period. The batch files say which components have changed power input/output and which are on outage / failed.  
 
  * **main.py** This takes a batch file and a PSAT data file and runs each scenario in Matlab/PSAT using the data file as a base. The results are stored as another batch file where each scenario has the results of pass or fail appended.
 
  * **psat.py** Almost everything is in here. It should be separated. 
 
- * **parselog.py** This takes the report from a Matlab/PSAT loadflow and converts it into a pass/fail result.
-
  * **misc.py** A few utilities.
 
 Classes
 =======
 
+    func clean_files          :: ->
+    func make_outages         :: NetworkProbability, Int -> SimulationBatch
+    func make_failures        :: NetworkProbability, Int -> SimulationBatch
+    func read_network         :: Str -> NetworkData
+    func read_batch           :: Str -> SimulationBatch
+    func report_to_psat       :: PsatReport, NetworkData -> NetworkData
+    func scenario_to_psat     :: Scenario, NetworkData -> NetworkData
+    func batch_simulate       :: SimulationBatch, Int -> SimulationBatch
+    func single_simulate      :: NetworkData, Str -> Bool
+    func single_matlab_script :: Str, Str -> Stream(matlab_file)
+    func batch_matlab_script  :: Str, SimulationBatch -> Stream(matlab_file)
+    func simulate             :: Str -> Bool
+    
     class NetworkData
       """
       matlab psat data file used in simulations.
@@ -68,11 +81,6 @@ Classes
       func __iter__ :: -> iter(Scenario)
       class Scenario
 
-    func write_scenario :: ostream, Scenario, NetworkData -> 
-    """
-    take a Scenario and NetworkData, combine to make a 
-    new NetworkData which gets written to a ostream.
-    """
 
 File Types
 ==========
@@ -152,7 +160,6 @@ Links
 Notes
 =====
 
- * It seems like a waste to start up and shut down matlab for every simulation.
  * There might be a way to trip out and modify a system while matlab is running in a way that will be much quicker to run
 
 To Try
@@ -164,3 +171,18 @@ To Try
  - OPF.report % not sure but should be checked out
  - clpsat.refresh = 0 % don't bother re-running the PF
  - clpsat.showopf % not sure
+
+Usage Notes
+====
+
+    >>> np = tmp.read_probabilities("rts.net")
+    >>> sb1 = tmp.make_outages(np, 100)
+    >>> len(list(iter(sb1)))
+    100
+    >>> spl = list(iter(sb1))[0]
+    >>> spl.write(sys.stdout)
+    [outage0] opf
+      remove generator 1
+      remove generator 18
+      set all demand 0.3978
+

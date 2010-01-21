@@ -28,6 +28,7 @@ from misc import grem
 from psat import SimulationBatch, NetworkProbability, NetworkData
 from psat_report import PsatReport
 from copy import deepcopy
+from misc import split_every
 import subprocess
 
 #------------------------------------------------------------------------------
@@ -42,8 +43,9 @@ def clean_files():
     """
     grem(".", r"psat_.*\.m")
     grem(".", r"psat_.*\.txt")
-    grem(".", r"solve_.*\.m")
+    grem(".", r"matlab_.*\.m")
     grem(".", r".*\.pyc")
+    grem(".", r".*\.bch")
     grem(".", r".*_[1234567890]{2}\.txt")
 
 
@@ -119,7 +121,7 @@ def report_in_limits(report):
        is the results of the simulation in limits based on report
     """
     # need to change the PsatReport class to get this working nicely
-    return report.inlimit()
+    return report.in_limit()
 
 
 def report_to_psat(report, psat):
@@ -175,41 +177,44 @@ def scenario_to_psat(scenario, psat):
     return new_psat
 
 
-def batch_simulate(batch, psat):
-    """func batch_simulate       :: SimulationBatch, NetworkData -> 
+def batch_simulate(batch, psat, size=10):
+    """func batch_simulate       :: SimulationBatch, NetworkData, Int -> 
        ----
-       
-       Note:: modify and return `batch` 
-       Note:: should it clean up after its self (grem matalb_ etc.)
-       Note:: should report_in_limits throw or return Str for failure
+       Simulate all Scenarios in `batch` (with a base of `psat`) in groups
+       of size `size`. Modify `batch` in place. delete all temp files
+       if it succedes 
+
+       Note:: what should we do on parsing error for report 
     """
 
-    title = "000"
-
-    # make the matlab_script
-    matlab_filename = "matlab_" + title + ".m"
-    batch_matlab_script(matlab_filename, batch)
-
-    # write all the scenarios to file as psat_files
-    for scenario in batch:
-        new_psat = scenario_to_psat(scenario, psat)
-        new_psat_filename = "psat_" + scenario.title + ".m"
-        with open(new_psat_filename, "w") as new_psat_file:
-            new_psat.write(new_psat_file)
-
-    # run matlab 
-    simulate(matlab_filename)
-
-    # gather results
-    for scenario in batch:
-        report_filename = "psat_" + scenario.title + "_01.txt"
-        with open(report_filename) as report_file:
-            report = read_report(report_file)
-            scenario.result = report_in_limits(report)
-
+    for n, group in enumerate(split_every(size, batch)):
+     
+        # make the matlab_script
+        matlab_filename = "matlab_" + str(n)
+        batch_matlab_script(matlab_filename + ".m", group)
+        
+        # write all the scenarios to file as psat_files
+        for scenario in group:
+            new_psat = scenario_to_psat(scenario, psat)
+            new_psat_filename = "psat_" + scenario.title + ".m"
+            with open(new_psat_filename, "w") as new_psat_file:
+                new_psat.write(new_psat_file)
+        
+        # run matlab 
+        simulate(matlab_filename)
+        
+        # gather results
+        for scenario in group:
+            report_filename = "psat_" + scenario.title + "_01.txt"
+            try:
+                report = read_report(report_filename)
+                scenario.result = report_in_limits(report)
+            except:
+                scenario.result = "error"
+    clean_files()
 
 def single_simulate(psat, simtype):
-    """func single_simulate      :: NetworkData, Str -> Bool
+    """func single_simulate      :: NetworkData, Str -> PsatReport
        ----
        run matlab with the NetworkData `psat` as either 
        power flow (pf) or optimal power flow (opf)
@@ -217,12 +222,12 @@ def single_simulate(psat, simtype):
     """
 
     title = "000"
-    matlab_filename = "matlab_" + title + ".m"
+    matlab_filename = "matlab_" + title
     psat_filename = "psat_" + title + ".m"
     report_filename = "psat_" + title + "_01.txt"
 
     # make the matlab_script
-    single_matlab_script(matlab_filename, psat_filename, simtype)
+    single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
 
     # write the NetworkData to file
     with open(psat_filename, "w") as psat_file:
@@ -231,10 +236,10 @@ def single_simulate(psat, simtype):
     # run matlab 
     simulate(matlab_filename)
 
-    # return result
-    with open(report_filename) as report_file:
-        report = read_report(report_file)
-        return report_in_limits(report)
+    # return the parsed report
+    report = read_report(report_filename)
+    clean_files()
+    return report
 
 
 def single_matlab_script(filename, psat_filename, simtype):
@@ -245,7 +250,7 @@ def single_matlab_script(filename, psat_filename, simtype):
        (simtype='opf').
     """
     
-    with open(filename) as matlab_stream:
+    with open(filename, "w") as matlab_stream:
 
         matlab_stream.write("initpsat;\n")
         matlab_stream.write("Settings.lfmit = 50;\n")
@@ -274,11 +279,12 @@ def batch_matlab_script(filename, batch):
     """
 
     assert len(batch) != 0
-    with open(filename) as matlab_stream:
+    with open(filename, "w") as matlab_stream:
 
         matlab_stream.write("initpsat;\n")
         matlab_stream.write("Settings.lfmit = 50;\n")
         matlab_stream.write("Settings.violations = 'on'\n")
+        matlab_stream.write("OPF.basepg = 0;\n")
 
         for scenario in batch:
             filename = "psat_" + scenario.title + ".m"
@@ -287,7 +293,6 @@ def batch_matlab_script(filename, batch):
             if scenario.simtype == "pf":
                 matlab_stream.write("runpsat pf;\n")
             elif scenario.simtype == "opf":
-                matlab_stream.write("OPF.basepg = 0;\n")
                 matlab_stream.write("runpsat pf;\n")
                 matlab_stream.write("runpsat opf;\n")
             else:
@@ -306,6 +311,7 @@ def simulate(matlab_filename):
        TODO:: parse the so and se for errors! 
     """
 
+    print "simulate", matlab_filename
     proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r ' + matlab_filename,
                             shell=True,
                             stdout=subprocess.PIPE,
@@ -314,14 +320,57 @@ def simulate(matlab_filename):
 
     so, se = proc.communicate()
 
-    # print "SE"
-    # print "================================="
-    # print se 
-    # print "================================="
+    print "SE"
+    print "================================="
+    print se 
+    print "================================="
 
-    # print "SO"
-    # print "================================="
-    # print so 
-    # print "================================="
+    print "SO"
+    print "================================="
+    print so 
+    print "================================="
 
+#------------------------------------------------------------------------------
+# 
+#------------------------------------------------------------------------------
 
+def example1():
+    """make 100 outages, simulate them, and save the resulting batch"""
+
+    psat = read_psat("rts.m")
+    prob = read_probabilities("rts.net")
+    batch = make_outages(prob, 100)
+
+    assert 100 == len(list(iter(batch)))
+
+    batch_simulate(batch, psat)
+
+    with open("rts.bch", "w") as result_file:
+        batch.write(result_file)
+
+# example1()
+
+def example2():
+    """test a report and actually see why if fails"""
+    
+    report_filename = "tmp_01.txt"
+    with open(report_filename) as report_file:
+        report = PsatReport()
+        res = report.read(report_file)
+        print "result =", res, "."
+
+# example2()
+
+def example3():
+    """one random failure, simulated as power flow"""
+    
+    psat = read_psat("rts.m")
+    prob = read_probabilities("rts.net")
+    batch = make_failures(prob, 1)
+    scenario = list(iter(batch))[0]
+
+    new_psat = scenario_to_psat(scenario, psat)
+    report = single_simulate(new_psat, "pf")
+    print "result =", report_in_limits(report), "."
+
+# example3()

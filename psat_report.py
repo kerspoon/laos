@@ -22,6 +22,8 @@
 James Brooks (kerspoon)
 
 Read in a report from psat; check format & sanity check.
+Note:: doesn't check component limits against their stored values
+Note:: doesn't fully fill in the data, but parses everythin
 """
 
 #------------------------------------------------------------------------------
@@ -96,12 +98,15 @@ class PsatReport(object):
         self.num_load = None
 
         self.power_rate = None
-        self.power_flow = []
-        self.line_flow = []
+        self.power_flow = {}
+        self.line_flow = {}
 
         self.acceptable = True
 
-    def parse_stream(self, stream):
+    def in_limit(self):
+        return self.acceptable
+
+    def read(self, stream):
         logger.debug("Parsing stream: %s" % stream)
 
         try:
@@ -128,9 +133,11 @@ class PsatReport(object):
     def process_header_title(self, tokens):
         # print("Header : %s" % tokens)
         if len(tokens[0]) == 1:
-            print "Power Flow"
+            # print "Power Flow"
+            pass
         elif len(tokens[0]) == 2:
-            print "Optimal Power Flow"
+            # print "Optimal Power Flow"
+            pass 
         else:
             raise Exception("%s" % tokens)
 
@@ -154,8 +161,8 @@ class PsatReport(object):
         self.power_rate = tokens[1]["rate"]
 
         # set length only (line flows are there and back)
-        self.power_flow = [None for _ in range(self.num_bus)]
-        self.line_flow = [None for _ in range(self.num_line * 2)]
+        self.power_flow = {}
+        self.line_flow = {}
 
     def process_pflow_bus(self, tokens):
         # print("Bus Power Flow : %s" % tokens)
@@ -172,6 +179,10 @@ class PsatReport(object):
         # im going to assume they are sequential.
 
         bus_num = tokens["bus"][0]
+
+        assert bus_num >= 0 
+        assert bus_num not in self.power_flow
+
         self.power_flow[bus_num] = self.PowerFlow(
             bus_num,
             tokens["v"],
@@ -181,9 +192,10 @@ class PsatReport(object):
             tokens["pl"],
             tokens["ql"])
 
-    def process_pflow_bus_limit(self, tokens):
+    def process_pflow_overload(self, _):
         # print("Limit : %s" % tokens)
-        self.ensure("limreact" not in tokens, "Reactive Power Limit")
+        
+        self.ensure(False, "PowerFlow Limit")
 
     def process_lineflow_bus(self, tokens):
         # print("Bus Line Flow : %s" % tokens)
@@ -257,28 +269,14 @@ class PsatReport(object):
 
         buses = OneOrMore(busdef.setParseAction(self.process_pflow_bus))
 
-        limvoltmin = (slit("Minimum voltage limit violation at bus <") +
-                      busname("limvoltmin") +
-                      slit("> [V_min =") + 
-                      decimal.suppress() + 
-                      slit("]"))
+        afix = (slit("Maximum") | slit("Minimum")) + (slit("reactive power") | slit("voltage")) 
+        postfix = busname("bus") + slit(">") + restOfLine.suppress()
 
-        topvolt = (slit("Maximum voltage at bus <") +
-                   busname("topvolt") +
-                   slit(">"))
+        binding = afix + slit("at bus <") + postfix
+        overload = afix + slit("limit violation at bus <") + postfix
+        overload.setParseAction(self.process_pflow_overload)
 
-        limreact = (slit("Maximum reactive power limit violation at bus <") +
-                    busname("limreact") +
-                    slit("> [Qg_max =") + 
-                    decimal.suppress() + 
-                    slit("]"))
-
-        topreact = (slit("Maximum reactive power at bus <") +
-                    busname("topreact") +
-                    slit(">"))
-
-        limline = limvoltmin | topvolt | limreact | topreact
-        limits = ZeroOrMore(limline).setParseAction(self.process_pflow_bus_limit)
+        limits = ZeroOrMore(binding | overload)
 
         return title + head1 + head2 + buses + limits
 

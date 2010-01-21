@@ -6,7 +6,7 @@ A program to look at the security of the IEEE RTS 96 using PSAT in Matlab. Pytho
 Files
 =====
 
- * **script.py** this is where all the main functionality of the program lies
+ * **script.py** this is where all the main functionality of the program lies. see the bottom of the file for some examples of how the program can be used.
 
  * **batch.py** This creates batch files from a Monte Carlo sample of failure probabilities. It can either show outages or failures within the next 1h period. The batch files say which components have changed power input/output and which are on outage / failed.  
 
@@ -171,18 +171,4 @@ To Try
  - OPF.report % not sure but should be checked out
  - clpsat.refresh = 0 % don't bother re-running the PF
  - clpsat.showopf % not sure
-
-Usage Notes
-====
-
-    >>> np = tmp.read_probabilities("rts.net")
-    >>> sb1 = tmp.make_outages(np, 100)
-    >>> len(list(iter(sb1)))
-    100
-    >>> spl = list(iter(sb1))[0]
-    >>> spl.write(sys.stdout)
-    [outage0] opf
-      remove generator 1
-      remove generator 18
-      set all demand 0.3978
 

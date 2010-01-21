@@ -468,13 +468,8 @@ class Scenario(object):
             stream.write("  set supply " + as_csv(item, " ") + "\n")
         for item in self.demand.items():
             stream.write("  set demand " + as_csv(item, " ") + "\n")
-        if self.result != None: # damn python's multiple true values
-            if self.result:
-                stream.write("  result pass\n")
-            elif not self.result:
-                stream.write("  result fail\n")
-            else:
-                stream.write("  result" + str(self.result) + "\n")
+        if self.result != None:
+            stream.write("  result" + self.result + "\n")
 
 class SimulationBatch(object):
     """
@@ -575,15 +570,9 @@ class SimulationBatch(object):
            
             # results 
             elif line[0] == "result":
-                if line[1] == "pass":
-                    self.scenarios[-1].result = True
-                    # logger.debug("result pass")
-                elif line[1] == "fail":
-                    self.scenarios[-1].result = False
-                    # logger.debug("result fail")
-                else:
-                    raise Exception("got %s expected (pass, fail)" % line[1])
-                    
+                assert line[1] in set("pass fail error".split())
+                self.scenarios[-1].result = line[1]
+
             # nothing else allowed
             else:
                 raise Exception("got %s expected (remove, set, result, [...], #)" % line[0])
@@ -594,28 +583,4 @@ class SimulationBatch(object):
 #------------------------------------------------------------------------------
 #  
 #------------------------------------------------------------------------------
-
-def write_scenario(stream, scenario, network):
-    """write the network to the file with the changes specified in scenario
-    """
-
-    newpsat = deepcopy(network)
-
-    for kill in scenario.kill["bus"]:
-        newpsat.remove_bus(kill)
-    for kill in scenario.kill["line"]:
-        newpsat.remove_line(kill[0], kill[1])
-    for kill in scenario.kill["generator"]:
-        newpsat.remove_generator(kill)
-    if scenario.all_supply:
-        newpsat.set_all_supply(scenario.all_supply)
-    if scenario.all_demand:
-        newpsat.set_all_demand(scenario.all_demand)
-    if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
-        raise Exception("not implemented")
-    
-    newpsat.write(stream)
-
-
-
 

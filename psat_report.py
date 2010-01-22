@@ -1,5 +1,5 @@
 #! /usr/local/bin/python
-# parse a psat report
+# psat_report.py - PsatReport - report_file - report
 
 #------------------------------------------------------------------------------
 # Copyright (C) 2009 James Brooks (kerspoon)
@@ -21,29 +21,24 @@
 """ Package info:
 James Brooks (kerspoon)
 
+psat_report.py - PsatReport - report_file - report
+
 Read in a report from psat; check format & sanity check.
 Note:: doesn't check component limits against their stored values
-Note:: doesn't fully fill in the data, but parses everythin
+Note:: doesn't fully fill in the data, but parses everything
 """
 
 #------------------------------------------------------------------------------
 # Imports:
 #------------------------------------------------------------------------------
 
-from parsingutil import *
+
+from parsingutil import Literal, integer, Group, Optional, slit, restOfLine, decimal
+from parsingutil import stringtolits, decimaltable, OneOrMore, ZeroOrMore
 from decimal import Decimal
-import logging
 import sys
 from copy import deepcopy
 
-#------------------------------------------------------------------------------
-# Logging:
-#------------------------------------------------------------------------------
-
-logger = logging.getLogger(__name__)
-
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
-    format="%(levelname)s: %(message)s")
 
 #------------------------------------------------------------------------------
 # Util:
@@ -107,7 +102,7 @@ class PsatReport(object):
         return self.acceptable
 
     def read(self, stream):
-        logger.debug("Parsing stream: %s" % stream)
+        print "Parsing stream: %s" % stream
 
         try:
             headers = self.GetHeaders()
@@ -119,9 +114,9 @@ class PsatReport(object):
 
             case = headers + stats + pflow + lineflow + summary + limits
             self.data = case.parseFile(stream)
-            logger.debug("Done Parsing stream")
+            print "Done Parsing stream"
         except:
-            logger.debug("PARSING ERROR")
+            print "PARSING ERROR"
             raise
         return self.acceptable
 

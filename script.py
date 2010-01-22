@@ -23,13 +23,17 @@
 # Imports:
 #------------------------------------------------------------------------------
 
+
 from __future__ import with_statement 
-from misc import grem
-from psat import SimulationBatch, NetworkProbability, NetworkData
-from psat_report import PsatReport
+from misc import grem, split_every
 from copy import deepcopy
-from misc import split_every
 import subprocess
+
+from simulation_batch import SimulationBatch
+from network_probability import NetworkProbability
+from psat_data import PsatData
+from psat_report import PsatReport
+
 
 #------------------------------------------------------------------------------
 # 
@@ -84,7 +88,7 @@ def read_file(filename, datatype):
         return data
 
 def read_probabilities(filename):
-    """func read_probabilities   :: Str -> NetworkData
+    """func read_probabilities   :: Str -> NetworkProbability
        ----
        read a net_file into NetworkProbability.
     """
@@ -92,11 +96,11 @@ def read_probabilities(filename):
     
 
 def read_psat(filename):
-    """func read_psat         :: Str -> NetworkData
+    """func read_psat         :: Str -> PsatData
        ----
-       read a psat_file into NetworkData.
+       read a psat_file into PsatData.
     """
-    return read_file(filename, NetworkData)
+    return read_file(filename, PsatData)
 
 
 def read_batch(filename):
@@ -116,18 +120,21 @@ def read_report(filename):
 
 
 def report_in_limits(report):
-    """report_in_limits          :: PsatReport -> Bool
+    """report_in_limits          :: PsatReport -> Str
        ----
        is the results of the simulation in limits based on report
     """
-    # need to change the PsatReport class to get this working nicely
-    return report.in_limit()
-
+    if report.in_limit():
+        return "pass"
+    elif not report.in_limit():
+        return "fail"
+    else:
+        return "error"
 
 def report_to_psat(report, psat):
-    """func report_to_psat       :: PsatReport, NetworkData -> NetworkData
+    """func report_to_psat       :: PsatReport, PsatData -> PsatData
        ----
-       Make a new NetworkData based upon `psat` but contains the voltage,
+       Make a new PsatData based upon `psat` but contains the voltage,
        angle, and power values from `report`.
     """
 
@@ -153,9 +160,9 @@ def report_to_psat(report, psat):
 
 
 def scenario_to_psat(scenario, psat):
-    """func scenario_to_psat     :: Scenario, NetworkData -> NetworkData
+    """func scenario_to_psat     :: Scenario, PsatData -> PsatData
        ----
-       Make a new NetworkData based upon `psat` but contains the changes
+       Make a new PsatData based upon `psat` but contains the changes
        specified in the scenario.
     """
 
@@ -178,7 +185,7 @@ def scenario_to_psat(scenario, psat):
 
 
 def batch_simulate(batch, psat, size=10):
-    """func batch_simulate       :: SimulationBatch, NetworkData, Int -> 
+    """func batch_simulate       :: SimulationBatch, PsatData, Int -> 
        ----
        Simulate all Scenarios in `batch` (with a base of `psat`) in groups
        of size `size`. Modify `batch` in place. delete all temp files
@@ -214,9 +221,9 @@ def batch_simulate(batch, psat, size=10):
     clean_files()
 
 def single_simulate(psat, simtype):
-    """func single_simulate      :: NetworkData, Str -> PsatReport
+    """func single_simulate      :: PsatData, Str -> PsatReport
        ----
-       run matlab with the NetworkData `psat` as either 
+       run matlab with the PsatData `psat` as either 
        power flow (pf) or optimal power flow (opf)
        return the results of the simulation.
     """
@@ -229,7 +236,7 @@ def single_simulate(psat, simtype):
     # make the matlab_script
     single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
 
-    # write the NetworkData to file
+    # write the PsatData to file
     with open(psat_filename, "w") as psat_file:
         psat.write(psat_file)
 
@@ -311,49 +318,58 @@ def simulate(matlab_filename):
        TODO:: parse the so and se for errors! 
     """
 
-    print "simulate", matlab_filename
-    proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r ' + matlab_filename,
-                            shell=True,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            stdin=subprocess.PIPE)
+    try:
 
-    so, se = proc.communicate()
+        print "simulate", matlab_filename
+        proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r ' + matlab_filename,
+                                shell=True,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                stdin=subprocess.PIPE)
 
-    print "SE"
-    print "================================="
-    print se 
-    print "================================="
+        so, se = proc.communicate()
+     
+        assert se == ""
 
-    print "SO"
-    print "================================="
-    print so 
-    print "================================="
+        # print "SE"
+        # print "================================="
+        # print se 
+        # print "================================="
+     
+        print "SO"
+        print "================================="
+        print so 
+        print "================================="
+
+        return True
+
+    except:
+        print "simulate failed"
+        return False
 
 #------------------------------------------------------------------------------
 # 
 #------------------------------------------------------------------------------
 
-def example1():
-    """make 100 outages, simulate them, and save the resulting batch"""
+def example1(n = 30):
+    """make `n` outages, simulate them, and save the resulting batch"""
 
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
-    batch = make_outages(prob, 100)
+    batch = make_outages(prob, n)
 
-    assert 100 == len(list(iter(batch)))
+    assert n == len(list(iter(batch)))
 
     batch_simulate(batch, psat)
 
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
-# example1()
+example1()
 
-def example2():
+def example2(report_filename = "tmp_01.txt"):
     """test a report and actually see why if fails"""
     
-    report_filename = "tmp_01.txt"
     with open(report_filename) as report_file:
         report = PsatReport()
         res = report.read(report_file)
@@ -374,3 +390,30 @@ def example3():
     print "result =", report_in_limits(report), "."
 
 # example3()
+
+def example4():
+    """one specified scenario, simulated as `simtype`"""
+
+    from StringIO import StringIO
+    from contextlib import closing
+
+    data = """
+      [outage28] opf
+        remove line 6 10
+        remove generator 1
+        remove generator 1
+        set all demand 0.5192
+        result fail
+          """
+    
+    with closing(StringIO(data)) as batch_stream:
+        batch = SimulationBatch()
+        batch.read(batch_stream)
+
+    psat = read_psat("rts.m")
+    scenario = list(iter(batch))[0]
+    new_psat = scenario_to_psat(scenario, psat)
+    report = single_simulate(new_psat, scenario.simtype)
+    print "result =", report_in_limits(report), "."
+
+# example4()

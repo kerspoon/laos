@@ -8,45 +8,61 @@ Files
 
  * **script.py** this is where all the main functionality of the program lies. see the bottom of the file for some examples of how the program can be used.
 
- * **batch.py** This creates batch files from a Monte Carlo sample of failure probabilities. It can either show outages or failures within the next 1h period. The batch files say which components have changed power input/output and which are on outage / failed.  
+ * simulation_batch.py - **SimulationBatch** - *batch_file* - batch
 
- * **main.py** This takes a batch file and a PSAT data file and runs each scenario in Matlab/PSAT using the data file as a base. The results are stored as another batch file where each scenario has the results of pass or fail appended.
+ * psat_report.py - **PsatReport** - *report_file* - report
 
- * **psat.py** Almost everything is in here. It should be separated. 
+ * psat_data.py - **PsatData** - *psat_file* - psat
+
+ * network_probability.py - **NetworkProbability** - *prob_file* - prob
+
+ * **buslevel.py** a messy utility to get load forecast and load forecast errors. 
 
  * **misc.py** A few utilities.
+
+ * **parsingutil.py** a few utilities for pyparsing
+
+ * **modifiedtestcase.py** a few utilities for unittest
 
 Classes
 =======
 
     func clean_files          :: ->
+
     func make_outages         :: NetworkProbability, Int -> SimulationBatch
     func make_failures        :: NetworkProbability, Int -> SimulationBatch
-    func read_network         :: Str -> NetworkData
+
+    func read_probabilities   :: Str -> NetworkProbability
+    func read_psat            :: Str -> PsatData
     func read_batch           :: Str -> SimulationBatch
-    func report_to_psat       :: PsatReport, NetworkData -> NetworkData
-    func scenario_to_psat     :: Scenario, NetworkData -> NetworkData
-    func batch_simulate       :: SimulationBatch, Int -> SimulationBatch
-    func single_simulate      :: NetworkData, Str -> Bool
-    func single_matlab_script :: Str, Str -> Stream(matlab_file)
-    func batch_matlab_script  :: Str, SimulationBatch -> Stream(matlab_file)
+    func read_report          :: Str -> PsatReport
+
+    func report_in_limits     :: PsatReport -> Str
+    func report_to_psat       :: PsatReport, PsatData -> PsatData
+    func scenario_to_psat     :: Scenario, PsatData -> PsatData
+
+    func batch_simulate       :: SimulationBatch, PsatData, Int -> 
+    func single_simulate      :: PsatData, Str -> PsatReport
+
+    func single_matlab_script :: Str, Str, Str -> 
+    func batch_matlab_script  :: Str, SimulationBatch -> 
     func simulate             :: Str -> Bool
-    
-    class NetworkData
+
+    class PsatData
       """
       matlab psat data file used in simulations.
       components can be removed to create specific scenarios though
       the recommended way is through the 'write_scenario' func.
       """
-      func read             :: istream(psatfile) -> 
-      func write            :: ostream(psatfile) ->
+      func read             :: istream(psat_file) -> 
+      func write            :: ostream(psat_file) ->
       func remove_bus       :: int(>0) ->
       func remove_line      :: int(>0), int(>0), Either(None, int(>0)) -> 
       func remove_generator :: int(>0), Either(None, int(>0)) -> 
-      func set_all_supply   :: real(>0) -> 
       func set_all_demand   :: real(>0) -> 
-      func set_supply       :: int(>0), real(>0) -> 
+      func set_all_supply   :: real(>0) -> 
       func set_demand       :: int(>0), real(>0) -> 
+      func set_supply       :: int(>0), real(>0) -> 
       class Bus
       class Line
       class Slack
@@ -76,17 +92,28 @@ Classes
       Scenario are a structure for holding changes to a network
       such as the loss of a components or change in power.
       """
-      func read     :: istream(batchfile) -> 
-      func write    :: ostream(batchfile) ->
+      func add      :: Scenario ->
+      func read     :: istream(batch_file) -> 
+      func write    :: ostream(batch_file) ->
       func __iter__ :: -> iter(Scenario)
       class Scenario
 
-
+    class PsatReport
+      """
+      Read in a report from psat; check format & sanity check.
+      """
+      class PowerFlow
+      class LineFlow
+      func in_limit :: -> Bool
+      func read     :: istream(report_file) -> 
+      func write    :: ostream(report_file) ->
+      
+      
 File Types
 ==========
 
-PSATFile
---------
+psat_file (*.m)
+----
 
 Defined in Link 6 (PSAT). 
 
@@ -99,8 +126,8 @@ Defined in Link 6 (PSAT).
      1   2   100  138  60  0  0   0.0026  0.0139  0.4611 0     0 1.93 0 2    1;
      ];
 
-NetFile
--------
+prob_file (*.net)
+----
 
 component probabilities. 
 
@@ -114,31 +141,33 @@ component probabilities.
     crow A13-2 A12-1 0.075
     crow A18   A20   0.075
 
-BatchFile
----------
+batch_file (*.bch)
+----
 
     [failure32] pf
       remove generator 13
       set all supply 0.86
     [outage0] opf
       remove generator 23
+      set all demand 1.0
     [outage1] opf
-      remove generator 1
-      remove generator 13
+      remove bus 1
+      remove line 13 3
       remove generator 22
 
-Testing Batch.py
-================
+matlab_file (*.m)
+----
 
-The idea is to run it many times and see if the results match the input probabilities.
+defined by psat manual.
 
-    /home/james/laos $ python batch.py -o rts.batch -i 100000 rts.net
-    /home/james/laos $ sort test.batch | grep -v '^\[' | uniq -c > test_res.batch
-
-Running 
-
-    /home/james/laos $ python batch.py -t failures -o rts.batch -i 100000 rts.net
-    /home/james/laos $ python main.py rts.m rts.batch -o rts.res
+    initpsat;
+    Settings.lfmit = 50;
+    Settings.violations = 'on'
+    runpsat('psat_filename','data');
+    runpsat pf;
+    runpsat pfrep;
+    closepsat;
+    exit;
 
 Links
 =====
@@ -161,6 +190,7 @@ Notes
 =====
 
  * There might be a way to trip out and modify a system while matlab is running in a way that will be much quicker to run
+ * to test the scenario generation probabilities are correct you can use `sort test.bch | grep -v '^\[' | uniq -c > test.csv`
 
 To Try
 ======

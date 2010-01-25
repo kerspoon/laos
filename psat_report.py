@@ -1,5 +1,5 @@
 #! /usr/local/bin/python
-# parse a psat report
+# psat_report.py - PsatReport - report_file - report
 
 #------------------------------------------------------------------------------
 # Copyright (C) 2009 James Brooks (kerspoon)
@@ -21,27 +21,22 @@
 """ Package info:
 James Brooks (kerspoon)
 
+psat_report.py - PsatReport - report_file - report
+
 Read in a report from psat; check format & sanity check.
+Note:: doesn't check component limits against their stored values
+Note:: doesn't fully fill in the data, but parses everything
 """
 
 #------------------------------------------------------------------------------
 # Imports:
 #------------------------------------------------------------------------------
 
-from parsingutil import *
+
+from parsingutil import Literal, integer, Group, Optional, restOfLine, decimal
+from parsingutil import stringtolits, decimaltable, OneOrMore, ZeroOrMore, slit
 from decimal import Decimal
-import logging
-import sys
-from copy import deepcopy
 
-#------------------------------------------------------------------------------
-# Logging:
-#------------------------------------------------------------------------------
-
-logger = logging.getLogger(__name__)
-
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
-    format="%(levelname)s: %(message)s")
 
 #------------------------------------------------------------------------------
 # Util:
@@ -56,10 +51,10 @@ def almost_equal(x, y):
 busname = Literal("Bus").suppress() + integer
 
 #------------------------------------------------------------------------------
-# PSATreport:
+# PsatReport:
 #------------------------------------------------------------------------------
 
-class PSATreport(object):
+class PsatReport(object):
     """Matlab PSAT report file.
     """
 
@@ -101,8 +96,11 @@ class PSATreport(object):
 
         self.acceptable = True
 
-    def parse_stream(self, stream):
-        logger.debug("Parsing stream: %s" % stream)
+    def in_limit(self):
+        return self.acceptable
+
+    def read(self, stream):
+        print "Parsing stream: %s" % stream
 
         try:
             headers = self.GetHeaders()
@@ -113,10 +111,10 @@ class PSATreport(object):
             limits = self.GetLimits()
 
             case = headers + stats + pflow + lineflow + summary + limits
-            data = case.parseFile(stream)
-            logger.debug("Done Parsing stream")
+            self.data = case.parseFile(stream)
+            print "Done Parsing stream"
         except:
-            logger.debug("PARSING ERROR")
+            print "PARSING ERROR"
             raise
         return self.acceptable
 
@@ -128,9 +126,11 @@ class PSATreport(object):
     def process_header_title(self, tokens):
         # print("Header : %s" % tokens)
         if len(tokens[0]) == 1:
-            print "Power Flow"
+            # print "Power Flow"
+            pass
         elif len(tokens[0]) == 2:
-            print "Optimal Power Flow"
+            # print "Optimal Power Flow"
+            pass 
         else:
             raise Exception("%s" % tokens)
 
@@ -141,10 +141,10 @@ class PSATreport(object):
             y = tokens[0][x]
             self.ensure(y > 0, "incorrect number of components, got " + str(y))
 
-        self.ensure(1 <= tokens[1]["iterations"] <= 10000, "error : \n%s" % tokens)
-        self.ensure(dec_check(tokens[1]["pmis"]), "error : \n%s" % tokens)
-        self.ensure(dec_check(tokens[1]["qmis"]), "error : \n%s" % tokens)
-        self.ensure(almost_equal("100", tokens[1]["rate"]), "error : \n%s" % tokens)
+        self.ensure(1 <= tokens[1]["iterations"] <= 10000, "iterations >= 1")
+        self.ensure(dec_check(tokens[1]["pmis"]), "pmis")
+        self.ensure(dec_check(tokens[1]["qmis"]), "qmis")
+        self.ensure(almost_equal("100", tokens[1]["rate"]), "rate == 100")
 
         self.num_load = tokens[0]["loads"]
         self.num_generator = tokens[0]["generators"]
@@ -153,6 +153,7 @@ class PSATreport(object):
         self.num_bus = tokens[0]["buses"]
         self.power_rate = tokens[1]["rate"]
 
+        # set length only (line flows are there and back)
         self.power_flow = {}
         self.line_flow = {}
 
@@ -163,26 +164,30 @@ class PSATreport(object):
         pu_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
         for x in "v pg qg pl ql".split():
             self.ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
-        self.ensure(dec_check(tokens["phase"],"-1.0","1.0"), "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["phase"]), "error : \n%s" % tokens)
 
         # actually add to self.power_flow
 
-        # are we to assume that there is a 1-to-1 mapping of names to the natural numbers
-        # if not then we need a very gay lookup, if so then ... woo 
-        # im going to assume they do map.
-        # even then, do we then keep the 1 based counting or convert to zero based. 
-        # GAAAAYYYY
-        # if I convert the external file to zero based. it wont then match the journal paper
-        # if I convert the interal representation it wont match the file or paper
-        # if I leave it then there may be strange bugs as there will be a dummy element
+        # are we to assume that there is a 1-to-1 mapping of names to the 
+        # natural numbers if not then we need a very gay lookup, if so then 
+        # ... woo
+        # im going to assume they do map. even then, do we then keep the 1 based 
+        # counting or convert to zero based. GAAAAYYYY
+        #  * if I convert the external file to zero based. it wont then match the
+        #    journal paper
+        #  * if I convert the interal representation it wont match the file or
+        #    paper
+        #  * if I leave it then there may be strange bugs as there will be a
+        #    dummy element
 
-        # I have decuded to use a dict rather than a list, it still has integers as the key
-        # it sovles the other problems. only requirement is that they are unique integers. 
+        # I have decided to use a dict rather than a list, it still has integers
+        # as the key it sovles the other problems. only requirement is that they
+        # are unique integers. 
 
         bus_num = tokens["bus"][0]
 
         assert bus_num >= 0
-        assert bus_num not in self.power_flow, "already added, do two bussed have the same num"
+        assert bus_num not in self.power_flow, "already added bus "+ str(bus_num) 
 
         self.power_flow[bus_num] = self.PowerFlow(
             bus_num,
@@ -193,9 +198,10 @@ class PSATreport(object):
             tokens["pl"],
             tokens["ql"])
 
-    def process_pflow_bus_limit(self, tokens):
+    def process_pflow_overload(self, _):
         # print("Limit : %s" % tokens)
-        self.ensure("limreact" not in tokens, "Reactive Power Limit")
+        
+        self.ensure(False, "PowerFlow Limit")
 
     def process_lineflow_bus(self, tokens):
         # print("Bus Line Flow : %s" % tokens)
@@ -214,11 +220,13 @@ class PSATreport(object):
         # print("Summary : %s" % tokens)
 
         inrange = lambda x: dec_check(x, Decimal("0.0"), Decimal("100.0"))
+        ten_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
+
         for x in range(4):
             self.ensure(inrange(x), "error : \n%s" % tokens)
 
-        self.ensure(dec_check(tokens[4], Decimal("-10.0"), Decimal("10.0")), "error : \n%s" % tokens)
-        self.ensure(dec_check(tokens[5], Decimal("-10.0"), Decimal("10.0")), "error : \n%s" % tokens)
+        self.ensure(ten_check(tokens[4]), "error : \n%s" % tokens)
+        self.ensure(ten_check(tokens[5]), "error : \n%s" % tokens)
 
     def process_limits(self, tokens):
         # print("Limits : %s" % tokens)
@@ -226,9 +234,9 @@ class PSATreport(object):
         if any((tok in tokens) for tok in ["reactfail", "voltfail"]):
             self.acceptable = False
 
-    #------------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     #
-    #------------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
 
     def GetHeaders(self):
         title = Group(Optional(Literal("OPTIMAL")) + Literal("POWER FLOW REPORT"))
@@ -269,28 +277,15 @@ class PSATreport(object):
 
         buses = OneOrMore(busdef.setParseAction(self.process_pflow_bus))
 
-        limvoltmin = (slit("Minimum voltage limit violation at bus <") +
-                      busname("limvoltmin") +
-                      slit("> [V_min =") + 
-                      decimal.suppress() + 
-                      slit("]"))
+        maxmin = slit("Maximum") | slit("Minimum")
+        afix = maxmin + (slit("reactive power") | slit("voltage")) 
+        postfix = busname("bus") + slit(">") + restOfLine.suppress()
 
-        topvolt = (slit("Maximum voltage at bus <") +
-                   busname("topvolt") +
-                   slit(">"))
+        binding = afix + slit("at bus <") + postfix
+        overload = afix + slit("limit violation at bus <") + postfix
+        overload.setParseAction(self.process_pflow_overload)
 
-        limreact = (slit("Maximum reactive power limit violation at bus <") +
-                    busname("limreact") +
-                    slit("> [Qg_max =") + 
-                    decimal.suppress() + 
-                    slit("]"))
-
-        topreact = (slit("Maximum reactive power at bus <") +
-                    busname("topreact") +
-                    slit(">"))
-
-        limline = limvoltmin | topvolt | limreact | topreact
-        limits = ZeroOrMore(limline).setParseAction(self.process_pflow_bus_limit)
+        limits = ZeroOrMore(binding | overload)
 
         return title + head1 + head2 + buses + limits
 
@@ -321,7 +316,9 @@ class PSATreport(object):
         totalload = slit("TOTAL LOAD") + real + react
         totalloss = slit("TOTAL LOSSES") + real + react
 
-        return (title + totalgen + totalload + totalloss).setParseAction(self.process_summary)
+        summary = title + totalgen + totalload + totalloss
+        summary.setParseAction(self.process_summary)
+        return summary
 
     def GetLimits(self):
         title = slit("LIMIT VIOLATION STATISTICS")
@@ -344,61 +341,12 @@ class PSATreport(object):
         real = slit("ALL REAL POWER FLOWS WITHIN LIMITS") + restOfLine.suppress()
         apparent = slit("ALL APPARENT POWER FLOWS WITHIN LIMITS") + restOfLine.suppress()
 
-        return (title + volt + react + current + real + apparent).setParseAction(self.process_limits)
+        limits = title + volt + react + current + real + apparent
+        limits.setParseAction(self.process_limits)
+        return limits
+
 
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
-
-def report_in_limits(report_stream):
-    report = PSATreport()
-    return report.parse_stream(report_stream)
-
-# report_in_limits(open("rts_01.txt"))
-
-#------------------------------------------------------------------------------
-#
-#------------------------------------------------------------------------------
-
-# take a psat report file and a psat file
-# combine to make a new psat file that has the following set. 
-#
-# SW.con
-#   3. V0      -- power_flow[slackbusnum]._v
-#   4. theta0  -- power_flow[slackbusnum]._phase
-#   9. Pg0     -- ???  power_flow[slackbusnum]._pg
-#
-# pv.con
-#   Pg         -- power_flow[busnum]._pg
-#   V0         -- power_flow[busnum]._v
-#
-# PQ.con
-#   Pl         -- power_flow[busnum]._pl
-#   Ql         -- power_flow[busnum]._ql
-# 
-
-def generate_scenario(report_stream, psat_data):
-
-    new_psat = deepcopy(psat_data)
-
-    report = PSATreport()
-    report.parse_stream(report_stream)
-    pf = report.power_flow
-
-    slack = new_psat.slack[0]
-    slack.v_magnitude = pf[slack.bus_no].v
-    slack.ref_angle = pf[slack.bus_no].phase
-    # slack.p_guess = pf[slack.bus_no].pg
-
-    for gen in new_psat.generators:
-        assert pf[gen.bus_no] != None
-        gen.p = pf[gen.bus_no].pg
-        gen.v = pf[gen.bus_no].v
-
-    for load in new_psat.loads:
-        assert pf[load.bus_no] != None
-        load.p = pf[load.bus_no].pl
-        load.q = pf[load.bus_no].ql
-
-    return new_psat
 

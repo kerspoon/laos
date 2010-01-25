@@ -73,13 +73,13 @@ def test_grem():
 # test_grem()        
 
 #------------------------------------------------------------------------------
-# splitEvery
+# split_every
 #------------------------------------------------------------------------------
 
-def splitEvery(n, iterable):
+def split_every(n, iterable):
     """
-    splitEvery :: Int -> [e] -> [[e]]
-    @'splitEvery' n@ splits a list into length-n pieces.  The last
+    split_every :: Int -> [e] -> [[e]]
+    @'split_every' n@ splits a list into length-n pieces.  The last
     piece will be shorter if @n@ does not evenly divide the length of
     the list.
     from: http://stackoverflow.com/questions/1915170#1915307
@@ -90,21 +90,21 @@ def splitEvery(n, iterable):
         yield piece
         piece = list(itertools.islice(i, n))
 
-def TEST_splitEvery():
+def TEST_split_every():
     # should not enter infinite loop with generators and lists
-    splitEvery(itertools.count(), 10)
-    splitEvery(range(1000), 10)
+    split_every(itertools.count(), 10)
+    split_every(range(1000), 10)
 
     # last piece must be shorter if n does not evenly divide
-    assert list(splitEvery(5, range(9))) == [[0, 1, 2, 3, 4], [5, 6, 7, 8]]
+    assert list(split_every(5, range(9))) == [[0, 1, 2, 3, 4], [5, 6, 7, 8]]
 
     # should give same correct results with generators
     tmp = itertools.islice(itertools.count(), 9)
-    assert list(splitEvery(5, tmp)) == [[0, 1, 2, 3, 4], [5, 6, 7, 8]]
+    assert list(split_every(5, tmp)) == [[0, 1, 2, 3, 4], [5, 6, 7, 8]]
 
     # should work with empty list. 
-    assert list(splitEvery(100, [])) == []
-# TEST_splitEvery()
+    assert list(split_every(100, [])) == []
+# TEST_split_every()
 
 #------------------------------------------------------------------------------
 #  as_csv :: [T], str -> str

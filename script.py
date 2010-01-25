@@ -138,6 +138,14 @@ def report_to_psat(report, psat):
        angle, and power values from `report`.
     """
 
+    assert len(psat.lines) == report.num_line
+    assert len(psat.slack) == 1
+    assert len(psat.generators) == report.num_generator
+    assert len(psat.busses) == report.num_bus
+    assert len(psat.loads) == report.num_load
+    assert len(psat.demand) == 0
+    assert len(psat.supply) == len(psat.loads)    
+
     new_psat = deepcopy(psat)
     pf = report.power_flow
 
@@ -241,12 +249,23 @@ def single_simulate(psat, simtype):
         psat.write(psat_file)
 
     # run matlab 
-    simulate(matlab_filename)
+    res = simulate(matlab_filename)
 
     # return the parsed report
     report = read_report(report_filename)
     clean_files()
     return report
+
+
+def simulate_scenario(psat, scenario):
+    """func simulate_scenario   :: PsatData, Scenario -> PsatReport
+       ----
+       make PsatData with `scenario` and `psat`. simulate it and 
+       return the report.
+    """
+
+    new_psat = scenario_to_psat(scenario, psat)
+    return single_simulate(new_psat, scenario.simtype)
 
 
 def single_matlab_script(filename, psat_filename, simtype):
@@ -316,12 +335,14 @@ def simulate(matlab_filename):
        call matlab with the specified script.
 
        TODO:: parse the so and se for errors! 
+       TODO:: do something with the return value or exception
     """
 
     try:
 
         print "simulate", matlab_filename
-        proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r ' + matlab_filename,
+        parameters = '-nodisplay -nojvm -nosplash -r '
+        proc = subprocess.Popen('matlab ' + parameters + matlab_filename,
                                 shell=True,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -345,11 +366,12 @@ def simulate(matlab_filename):
 
     except:
         print "simulate failed"
-        return False
+        raise
 
 #------------------------------------------------------------------------------
 # 
 #------------------------------------------------------------------------------
+
 
 def example1(n = 30):
     """make `n` outages, simulate them, and save the resulting batch"""
@@ -365,7 +387,9 @@ def example1(n = 30):
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
+
 example1()
+
 
 def example2(report_filename = "tmp_01.txt"):
     """test a report and actually see why if fails"""
@@ -375,7 +399,9 @@ def example2(report_filename = "tmp_01.txt"):
         res = report.read(report_file)
         print "result =", res, "."
 
+
 # example2()
+
 
 def example3():
     """one random failure, simulated as power flow"""
@@ -389,10 +415,12 @@ def example3():
     report = single_simulate(new_psat, "pf")
     print "result =", report_in_limits(report), "."
 
+
 # example3()
 
+
 def example4():
-    """one specified scenario, simulated as `simtype`"""
+    """one specified scenario, simulated"""
 
     from StringIO import StringIO
     from contextlib import closing
@@ -416,4 +444,26 @@ def example4():
     report = single_simulate(new_psat, scenario.simtype)
     print "result =", report_in_limits(report), "."
 
+
 # example4()
+
+
+
+def example5(psat, scenario):
+    """take a scenario, sim it. get the results 
+       use results to make new PsatData, return it
+    """
+
+    assert scenario.simtype == "opf"
+    report = simulate_scenario(scenario, psat)
+
+    if not report_in_limits(report):
+        raise Exception("base scenario failed")
+
+    # NOTE:: do I have to use the new_psat in simulate_scenario
+    #        as this might have certain things removed properly
+    #        best yet would be for report_to_psat to fail if 
+    #        the component numbers don't match. 
+
+    return report_to_psat(report, psat)
+

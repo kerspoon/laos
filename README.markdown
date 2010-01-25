@@ -43,6 +43,7 @@ Classes
 
     func batch_simulate       :: SimulationBatch, PsatData, Int -> 
     func single_simulate      :: PsatData, Str -> PsatReport
+    func simulate_scenario   :: PsatData, Scenario -> PsatReport
 
     func single_matlab_script :: Str, Str, Str -> 
     func batch_matlab_script  :: Str, SimulationBatch -> 

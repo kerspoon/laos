@@ -37,13 +37,14 @@ Classes
     func read_batch           :: Str -> SimulationBatch
     func read_report          :: Str -> PsatReport
 
-    func report_in_limits     :: PsatReport -> Str
     func report_to_psat       :: PsatReport, PsatData -> PsatData
+    func text_to_scenario     :: Str -> Scenario
     func scenario_to_psat     :: Scenario, PsatData -> PsatData
 
     func batch_simulate       :: SimulationBatch, PsatData, Int -> 
     func single_simulate      :: PsatData, Str -> PsatReport
-    func simulate_scenario   :: PsatData, Scenario -> PsatReport
+    func simulate_scenario    :: PsatData, Scenario -> PsatReport
+    func report_in_limits     :: PsatReport -> Str
 
     func single_matlab_script :: Str, Str, Str -> 
     func batch_matlab_script  :: Str, SimulationBatch -> 

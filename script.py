@@ -28,6 +28,8 @@ from __future__ import with_statement
 from misc import grem, split_every
 from copy import deepcopy
 import subprocess
+from StringIO import StringIO
+from contextlib import closing
 
 from simulation_batch import SimulationBatch
 from network_probability import NetworkProbability
@@ -62,6 +64,7 @@ def make_outages(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.outages(str(x)))
+    assert count == len(batch)
     return batch
 
 
@@ -165,6 +168,21 @@ def report_to_psat(report, psat):
         load.q = pf[load.bus_no].q
 
     return new_psat
+
+
+def text_to_scenario(text):
+    """func text_to_scenario     :: Str -> Scenario
+       ----
+       make `text` into a Scenario by reading as if a 
+       single element batch file
+    """
+    
+    with closing(StringIO(text)) as batch_stream:
+        batch = SimulationBatch()
+        batch.read(batch_stream)
+
+    assert len(batch) == 1
+    return batch[0]
 
 
 def scenario_to_psat(scenario, psat):
@@ -350,7 +368,7 @@ def simulate(matlab_filename):
 
         so, se = proc.communicate()
      
-        assert se == ""
+        assert se == "", "sim-error: " + se
 
         # print "SE"
         # print "================================="
@@ -380,15 +398,13 @@ def example1(n = 30):
     prob = read_probabilities("rts.net")
     batch = make_outages(prob, n)
 
-    assert n == len(list(iter(batch)))
-
     batch_simulate(batch, psat)
 
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
 
-example1()
+# example1()
 
 
 def example2(report_filename = "tmp_01.txt"):
@@ -404,15 +420,13 @@ def example2(report_filename = "tmp_01.txt"):
 
 
 def example3():
-    """one random failure, simulated as power flow"""
+    """one random failure"""
     
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
     batch = make_failures(prob, 1)
-    scenario = list(iter(batch))[0]
-
-    new_psat = scenario_to_psat(scenario, psat)
-    report = single_simulate(new_psat, "pf")
+    scenario = batch[0]
+    report = simulate_scenario(psat, scenario)
     print "result =", report_in_limits(report), "."
 
 
@@ -422,8 +436,6 @@ def example3():
 def example4():
     """one specified scenario, simulated"""
 
-    from StringIO import StringIO
-    from contextlib import closing
 
     data = """
       [outage28] opf
@@ -433,32 +445,24 @@ def example4():
         set all demand 0.5192
         result fail
           """
-    
-    with closing(StringIO(data)) as batch_stream:
-        batch = SimulationBatch()
-        batch.read(batch_stream)
 
+    scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
-    scenario = list(iter(batch))[0]
-    new_psat = scenario_to_psat(scenario, psat)
-    report = single_simulate(new_psat, scenario.simtype)
+    report = simulate_scenario(psat, scenario)
+
     print "result =", report_in_limits(report), "."
 
 
 # example4()
 
 
-
-def example5(psat, scenario):
+def create_base(scenario, psat):
     """take a scenario, sim it. get the results 
        use results to make new PsatData, return it
     """
-
     assert scenario.simtype == "opf"
-    report = simulate_scenario(scenario, psat)
-
-    if not report_in_limits(report):
-        raise Exception("base scenario failed")
+    report = simulate_scenario(psat, scenario)
+    assert report_in_limits(report)
 
     # NOTE:: do I have to use the new_psat in simulate_scenario
     #        as this might have certain things removed properly
@@ -466,4 +470,17 @@ def example5(psat, scenario):
     #        the component numbers don't match. 
 
     return report_to_psat(report, psat)
+    
+
+def example5():
+    prob = read_probabilities("rts.net")
+    scenario = prob.outages("000")
+    psat = read_psat("rts.m")
+    new_psat = create_base(scenario, psat)
+
+    report = single_simulate(new_psat, "pf")
+    assert report_in_limits(report)
+
+
+example5()
 

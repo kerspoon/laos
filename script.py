@@ -439,11 +439,7 @@ def example4():
 
     data = """
       [outage28] opf
-        remove line 6 10
-        remove generator 1
-        remove generator 1
-        set all demand 0.5192
-        result fail
+        remove bus 13
           """
 
     scenario = text_to_scenario(data)
@@ -453,7 +449,7 @@ def example4():
     print "result =", report_in_limits(report), "."
 
 
-# example4()
+example4()
 
 
 def create_base(scenario, psat):
@@ -461,7 +457,11 @@ def create_base(scenario, psat):
        use results to make new PsatData, return it
     """
     assert scenario.simtype == "opf"
-    report = simulate_scenario(psat, scenario)
+
+    # `simulate_scenario` but keep `new_psat`
+    new_psat = scenario_to_psat(scenario, psat)
+    report = single_simulate(new_psat, scenario.simtype)
+
     assert report_in_limits(report)
 
     # NOTE:: do I have to use the new_psat in simulate_scenario
@@ -469,7 +469,7 @@ def create_base(scenario, psat):
     #        best yet would be for report_to_psat to fail if 
     #        the component numbers don't match. 
 
-    return report_to_psat(report, psat)
+    return report_to_psat(report, new_psat)
     
 
 def example5():
@@ -482,5 +482,5 @@ def example5():
     assert report_in_limits(report)
 
 
-example5()
+# example5()
 

@@ -37,6 +37,10 @@ import re
 
 def write_section(stream, items, title):
     """write one section of a Matlab file"""
+
+    if len(items) == 0:
+        return
+
     stream.write(title + ".con = [ ... \n")
     for item in items:
         stream.write("  " + str(item) + "\n")
@@ -164,11 +168,8 @@ class PsatData(object):
         # list all matches
         matches = [x for x in self.busses if x.bus_no == bus_no]
 
-        if len(matches) == 0:
-            print "Unable to find bus:", bus_no
-            return
-
         # bus names must be unique
+        assert len(matches) != 0, "Unable to find bus: " + str(bus_no)
         assert len(matches) == 1
         
         # remove it 
@@ -179,8 +180,8 @@ class PsatData(object):
         self.lines = filter(lambda x: x.fbus != thebus and x.tbus != thebus, self.lines)
         
         self.slack = filter(lambda x: x.bus_no != thebus, self.slack) 
-        if len(self.slack) == 0:
-            print "todo: deal with deleting slack bus"
+
+        assert len(self.slack) == 1, "todo: deal with deleting slack bus"
 
         self.generators = filter(lambda x: x.bus_no != thebus, self.generators)
         self.loads = filter(lambda x: x.bus_no != thebus, self.loads)
@@ -215,11 +216,10 @@ class PsatData(object):
     def remove_item(self, matches, iterable, item_no, bus_no):
 
         # error if no matches 
-        if len(matches) == 0:
-            print "Unable to find item:", bus_no
+        assert len(matches) != 0, "Unable to find item: " + str(bus_no)
 
         # simple if one match 
-        elif len(matches) == 1:
+        if len(matches) == 1:
             iterable.remove(matches[0])
         # remove only one if there is more
         elif len(matches) > 1:

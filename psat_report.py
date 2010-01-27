@@ -100,7 +100,7 @@ class PsatReport(object):
         return self.acceptable
 
     def read(self, stream):
-        print "Parsing stream: %s" % stream
+        # print "Parsing stream: %s" % stream
 
         try:
             headers = self.GetHeaders()
@@ -112,7 +112,7 @@ class PsatReport(object):
 
             case = headers + stats + pflow + lineflow + summary + limits
             self.data = case.parseFile(stream)
-            print "Done Parsing stream"
+            # print "Done Parsing stream"
         except:
             print "PARSING ERROR"
             raise

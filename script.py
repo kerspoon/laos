@@ -27,7 +27,10 @@
 from __future__ import with_statement 
 from misc import grem, split_every
 from copy import deepcopy
+import math 
 import subprocess
+import sys 
+import time 
 from StringIO import StringIO
 from contextlib import closing
 
@@ -221,6 +224,9 @@ def batch_simulate(batch, psat, size=10):
     """
 
     for n, group in enumerate(split_every(size, batch)):
+        timer_start = time.clock()
+        print "simulating batch",  n, "of", int(math.ceil(len(batch) / size))
+        sys.stdout.flush()
      
         # make the matlab_script
         matlab_filename = "matlab_" + str(n)
@@ -228,7 +234,13 @@ def batch_simulate(batch, psat, size=10):
         
         # write all the scenarios to file as psat_files
         for scenario in group:
-            new_psat = scenario_to_psat(scenario, psat)
+
+            try:
+                new_psat = scenario_to_psat(scenario, psat)
+            except Exception as ex:
+                print "exception in scenario_to_psat", ex
+                new_psat = deepcopy(psat)
+
             new_psat_filename = "psat_" + scenario.title + ".m"
             with open(new_psat_filename, "w") as new_psat_file:
                 new_psat.write(new_psat_file)
@@ -242,8 +254,13 @@ def batch_simulate(batch, psat, size=10):
             try:
                 report = read_report(report_filename)
                 scenario.result = report_in_limits(report)
-            except:
+            except Exception as ex:
+                print "exception in parsing/checking report", ex
                 scenario.result = "error"
+
+        timer_end = time.clock()
+        timer_time = (timer_end-timer_start)
+        print "batch time of", int(math.ceil(timer_time)), "seconds"
     clean_files()
 
 def single_simulate(psat, simtype):
@@ -358,7 +375,7 @@ def simulate(matlab_filename):
 
     try:
 
-        print "simulate", matlab_filename
+        # print "simulate", matlab_filename
         parameters = '-nodisplay -nojvm -nosplash -r '
         proc = subprocess.Popen('matlab ' + parameters + matlab_filename,
                                 shell=True,
@@ -374,11 +391,10 @@ def simulate(matlab_filename):
         # print "================================="
         # print se 
         # print "================================="
-     
-        print "SO"
-        print "================================="
-        print so 
-        print "================================="
+        # print "SO"
+        # print "================================="
+        # print so 
+        # print "================================="
 
         return True
 
@@ -391,20 +407,20 @@ def simulate(matlab_filename):
 #------------------------------------------------------------------------------
 
 
-def example1(n = 30):
+def example1(n = 500):
     """make `n` outages, simulate them, and save the resulting batch"""
 
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
     batch = make_outages(prob, n)
 
-    batch_simulate(batch, psat)
+    batch_simulate(batch, psat, 100)
 
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
 
-# example1()
+example1()
 
 
 def example2(report_filename = "tmp_01.txt"):
@@ -449,7 +465,7 @@ def example4():
     print "result =", report_in_limits(report), "."
 
 
-example4()
+# example4()
 
 
 def create_base(scenario, psat):
@@ -483,4 +499,3 @@ def example5():
 
 
 # example5()
-

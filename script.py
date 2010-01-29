@@ -27,7 +27,12 @@
 from __future__ import with_statement 
 from misc import grem, split_every
 from copy import deepcopy
+import math 
 import subprocess
+import sys 
+import time 
+from StringIO import StringIO
+from contextlib import closing
 
 from simulation_batch import SimulationBatch
 from network_probability import NetworkProbability
@@ -62,6 +67,7 @@ def make_outages(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.outages(str(x)))
+    assert count == len(batch)
     return batch
 
 
@@ -138,6 +144,14 @@ def report_to_psat(report, psat):
        angle, and power values from `report`.
     """
 
+    assert len(psat.lines) == report.num_line
+    assert len(psat.slack) == 1
+    assert len(psat.generators) == report.num_generator
+    assert len(psat.busses) == report.num_bus
+    assert len(psat.loads) == report.num_load
+    assert len(psat.demand) == 0
+    assert len(psat.supply) == len(psat.loads)    
+
     new_psat = deepcopy(psat)
     pf = report.power_flow
 
@@ -157,6 +171,21 @@ def report_to_psat(report, psat):
         load.q = pf[load.bus_no].q
 
     return new_psat
+
+
+def text_to_scenario(text):
+    """func text_to_scenario     :: Str -> Scenario
+       ----
+       make `text` into a Scenario by reading as if a 
+       single element batch file
+    """
+    
+    with closing(StringIO(text)) as batch_stream:
+        batch = SimulationBatch()
+        batch.read(batch_stream)
+
+    assert len(batch) == 1
+    return batch[0]
 
 
 def scenario_to_psat(scenario, psat):
@@ -195,6 +224,9 @@ def batch_simulate(batch, psat, size=10):
     """
 
     for n, group in enumerate(split_every(size, batch)):
+        timer_start = time.clock()
+        print "simulating batch",  n, "of", int(math.ceil(len(batch) / size))
+        sys.stdout.flush()
      
         # make the matlab_script
         matlab_filename = "matlab_" + str(n)
@@ -202,7 +234,13 @@ def batch_simulate(batch, psat, size=10):
         
         # write all the scenarios to file as psat_files
         for scenario in group:
-            new_psat = scenario_to_psat(scenario, psat)
+
+            try:
+                new_psat = scenario_to_psat(scenario, psat)
+            except Exception as ex:
+                print "exception in scenario_to_psat", ex
+                new_psat = deepcopy(psat)
+
             new_psat_filename = "psat_" + scenario.title + ".m"
             with open(new_psat_filename, "w") as new_psat_file:
                 new_psat.write(new_psat_file)
@@ -216,8 +254,13 @@ def batch_simulate(batch, psat, size=10):
             try:
                 report = read_report(report_filename)
                 scenario.result = report_in_limits(report)
-            except:
+            except Exception as ex:
+                print "exception in parsing/checking report", ex
                 scenario.result = "error"
+
+        timer_end = time.clock()
+        timer_time = (timer_end-timer_start)
+        print "batch time of", int(math.ceil(timer_time)), "seconds"
     clean_files()
 
 def single_simulate(psat, simtype):
@@ -241,12 +284,23 @@ def single_simulate(psat, simtype):
         psat.write(psat_file)
 
     # run matlab 
-    simulate(matlab_filename)
+    res = simulate(matlab_filename)
 
     # return the parsed report
     report = read_report(report_filename)
     clean_files()
     return report
+
+
+def simulate_scenario(psat, scenario):
+    """func simulate_scenario   :: PsatData, Scenario -> PsatReport
+       ----
+       make PsatData with `scenario` and `psat`. simulate it and 
+       return the report.
+    """
+
+    new_psat = scenario_to_psat(scenario, psat)
+    return single_simulate(new_psat, scenario.simtype)
 
 
 def single_matlab_script(filename, psat_filename, simtype):
@@ -314,14 +368,15 @@ def simulate(matlab_filename):
     """func simulate             :: Str -> Bool
        ----
        call matlab with the specified script.
-
        TODO:: parse the so for errors! 
+       TODO:: do something with the return value or exception
     """
 
     try:
 
-        print "simulate", matlab_filename
-        proc = subprocess.Popen('matlab -nodisplay -nojvm -nosplash -r ' + matlab_filename,
+        # print "simulate", matlab_filename
+        parameters = '-nodisplay -nojvm -nosplash -r '
+        proc = subprocess.Popen('matlab ' + parameters + matlab_filename,
                                 shell=True,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -329,43 +384,43 @@ def simulate(matlab_filename):
 
         so, se = proc.communicate()
      
-        assert se == ""
+        assert se == "", "sim-error: " + se
 
         # print "SE"
         # print "================================="
         # print se 
         # print "================================="
-     
-        print "SO"
-        print "================================="
-        print so 
-        print "================================="
+        # print "SO"
+        # print "================================="
+        # print so 
+        # print "================================="
 
         return True
 
     except:
         print "simulate failed"
-        return False
+        raise
 
 #------------------------------------------------------------------------------
 # 
 #------------------------------------------------------------------------------
 
-def example1(n = 30):
+
+def example1(n = 500):
     """make `n` outages, simulate them, and save the resulting batch"""
 
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
     batch = make_outages(prob, n)
 
-    assert n == len(list(iter(batch)))
-
-    batch_simulate(batch, psat)
+    batch_simulate(batch, psat, 100)
 
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
+
 example1()
+
 
 def example2(report_filename = "tmp_01.txt"):
     """test a report and actually see why if fails"""
@@ -375,45 +430,71 @@ def example2(report_filename = "tmp_01.txt"):
         res = report.read(report_file)
         print "result =", res, "."
 
+
 # example2()
 
+
 def example3():
-    """one random failure, simulated as power flow"""
+    """one random failure"""
     
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
     batch = make_failures(prob, 1)
-    scenario = list(iter(batch))[0]
-
-    new_psat = scenario_to_psat(scenario, psat)
-    report = single_simulate(new_psat, "pf")
+    scenario = batch[0]
+    report = simulate_scenario(psat, scenario)
     print "result =", report_in_limits(report), "."
+
 
 # example3()
 
-def example4():
-    """one specified scenario, simulated as `simtype`"""
 
-    from StringIO import StringIO
-    from contextlib import closing
+def example4():
+    """one specified scenario, simulated"""
+
 
     data = """
       [outage28] opf
-        remove line 6 10
-        remove generator 1
-        remove generator 1
-        set all demand 0.5192
-        result fail
+        remove bus 13
           """
-    
-    with closing(StringIO(data)) as batch_stream:
-        batch = SimulationBatch()
-        batch.read(batch_stream)
 
+    scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
-    scenario = list(iter(batch))[0]
-    new_psat = scenario_to_psat(scenario, psat)
-    report = single_simulate(new_psat, scenario.simtype)
+    report = simulate_scenario(psat, scenario)
+
     print "result =", report_in_limits(report), "."
 
+
 # example4()
+
+
+def create_base(scenario, psat):
+    """take a scenario, sim it. get the results 
+       use results to make new PsatData, return it
+    """
+    assert scenario.simtype == "opf"
+
+    # `simulate_scenario` but keep `new_psat`
+    new_psat = scenario_to_psat(scenario, psat)
+    report = single_simulate(new_psat, scenario.simtype)
+
+    assert report_in_limits(report)
+
+    # NOTE:: do I have to use the new_psat in simulate_scenario
+    #        as this might have certain things removed properly
+    #        best yet would be for report_to_psat to fail if 
+    #        the component numbers don't match. 
+
+    return report_to_psat(report, new_psat)
+    
+
+def example5():
+    prob = read_probabilities("rts.net")
+    scenario = prob.outages("000")
+    psat = read_psat("rts.m")
+    new_psat = create_base(scenario, psat)
+
+    report = single_simulate(new_psat, "pf")
+    assert report_in_limits(report)
+
+
+# example5()

@@ -73,6 +73,10 @@ class Scenario(object):
 
 class SimulationBatch(object):
     """
+       not really sure if this class is needed at all
+       it's basically just scenario_file_read/write 
+       nothing else is useful in it. 
+
        e.g. 
            [abc]
                remove bus 1
@@ -89,6 +93,15 @@ class SimulationBatch(object):
 
     def __init__(self):
         self.scenarios = []
+
+    def __iter__(self):
+        return iter(self.scenarios)
+
+    def __len__(self):
+        return len(self.scenarios)
+
+    def __getitem__(self, key):
+        return self.scenarios[key]
 
     def add(self, scenario):
         self.scenarios.append(scenario)
@@ -176,9 +189,6 @@ class SimulationBatch(object):
             # nothing else allowed
             else:
                 raise Exception("got %s expected (remove, set, result, [...], #)" % line[0])
-
-    def __iter__(self):
-        return iter(self.scenarios)
 
 
 #------------------------------------------------------------------------------

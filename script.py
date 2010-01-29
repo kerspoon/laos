@@ -144,13 +144,16 @@ def report_to_psat(report, psat):
        angle, and power values from `report`.
     """
 
-    assert len(psat.lines) == report.num_line
-    assert len(psat.slack) == 1
-    assert len(psat.generators) == report.num_generator
-    assert len(psat.busses) == report.num_bus
-    assert len(psat.loads) == report.num_load
-    assert len(psat.demand) == 0
-    assert len(psat.supply) == len(psat.loads)    
+
+    print "WARING ADD THESE LINES BACK IN"
+
+    # assert len(psat.lines) == report.num_line
+    # assert len(psat.slack) == 1
+    # assert len(psat.generators) == report.num_generator
+    # assert len(psat.busses) == report.num_bus
+    # assert len(psat.loads) == report.num_load
+    # assert len(psat.demand) == 0
+    # assert len(psat.supply) == len(psat.loads)
 
     new_psat = deepcopy(psat)
     pf = report.power_flow
@@ -167,8 +170,8 @@ def report_to_psat(report, psat):
 
     for load in new_psat.loads:
         assert pf[load.bus_no] != None
-        load.p = pf[load.bus_no].pg
-        load.q = pf[load.bus_no].q
+        load.p = pf[load.bus_no].pl
+        load.q = pf[load.bus_no].ql
 
     return new_psat
 
@@ -406,20 +409,19 @@ def simulate(matlab_filename):
 #------------------------------------------------------------------------------
 
 
-def example1(n = 500):
+def example1(n = 100):
     """make `n` outages, simulate them, and save the resulting batch"""
 
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
     batch = make_outages(prob, n)
 
-    batch_simulate(batch, psat, 100)
+    batch_simulate(batch, psat, 30)
 
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
-
-example1()
+# example1()
 
 
 def example2(report_filename = "tmp_01.txt"):
@@ -453,15 +455,17 @@ def example4():
 
 
     data = """
-      [outage28] opf
-        remove bus 13
+[outage16] opf
+  remove generator 1
+  set all demand 0.5963625
+  result pass
           """
 
     scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
     report = simulate_scenario(psat, scenario)
 
-    print "result =", report_in_limits(report), "."
+    print "result = '" + str(report_in_limits(report)) + "'"
 
 
 # example4()
@@ -498,3 +502,90 @@ def example5():
 
 
 # example5()
+
+# -----------------------------------------------------------------------------
+
+
+def test001():
+    """
+    make a system that has 2 generating units on one bus 
+    delete one at a time.
+    """
+
+    from psat_data import read_section
+
+    psat = PsatData()
+    assert len(psat.generators) == 0
+    
+    text = """
+  1  100  138  1.72  1.035  0.8  -0.5  1.05  0.95  1  1;
+  2  100  138  1.72  1.035  0.8  -0.5  1.05  0.95  1  1;
+
+    """
+
+    with closing(StringIO(text)) as stream:
+        read_section(stream, psat.generators, psat.Generator)
+
+    assert len(psat.generators) == 3
+
+    psat.remove_generator(1)
+    assert len(psat.generators) == 2
+
+    psat.remove_generator(1)
+    assert len(psat.generators) == 1
+
+
+def test002():
+    """take the normal system, sim it and save report. 
+       do the same with a system where all PV busses have their 
+       P & V values set to 0. it shouldn't matter with an 'opf'.
+    """
+    clean_files()
+
+    simtype = "opf"
+
+    def helper(title):
+        matlab_filename = "matlab_" + title
+        psat_filename = title + ".m"
+        single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
+        simulate(matlab_filename)
+
+    helper("rts")
+    helper("rts2")
+
+
+test002()
+
+
+def test003():
+    """
+    load flow a file then do it again; psat_report and psat_data should match
+    """
+
+    clean_files()
+
+    simtype = "pf"
+
+    def helper(title):
+        matlab_filename = "matlab_" + title
+        psat_filename = title + ".m"
+        single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
+        simulate(matlab_filename)
+
+    helper("rts")
+
+    report = read_report("rts_01.txt")
+    psat = read_psat("rts.m")
+    new_psat = report_to_psat(report, psat)
+
+    with open("rts003.m","w") as new_psat_stream:
+        new_psat.write(new_psat_stream)
+
+    helper("rts003")
+
+
+# test003()
+
+
+# -----------------------------------------------------------------------------
+

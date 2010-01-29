@@ -43,7 +43,7 @@ def write_section(stream, items, title):
 
     stream.write(title + ".con = [ ... \n")
     for item in items:
-        stream.write("  " + str(item) + "\n")
+        stream.write("  " + str(item) + ";\n")
     stream.write(" ];\n")
 
 

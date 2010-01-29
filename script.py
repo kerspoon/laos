@@ -120,7 +120,7 @@ def read_report(filename):
 
 
 def report_in_limits(report):
-    """report_in_limits          :: PsatReport -> Str
+    """func report_in_limits          :: PsatReport -> Str
        ----
        is the results of the simulation in limits based on report
     """
@@ -274,7 +274,7 @@ def single_matlab_script(filename, psat_filename, simtype):
             raise Exception("expected pf or opf got: " + simtype)
         matlab_stream.write("runpsat pfrep;\n")
         matlab_stream.write("closepsat;\n")
-        matlab_stream.write("exit\n")
+        matlab_stream.write("exit;\n")
 
 
 def batch_matlab_script(filename, batch):
@@ -315,7 +315,7 @@ def simulate(matlab_filename):
        ----
        call matlab with the specified script.
 
-       TODO:: parse the so and se for errors! 
+       TODO:: parse the so for errors! 
     """
 
     try:

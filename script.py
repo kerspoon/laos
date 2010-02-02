@@ -266,12 +266,13 @@ def batch_simulate(batch, psat, size=10):
         print "batch time of", int(math.ceil(timer_time)), "seconds"
     clean_files()
 
-def single_simulate(psat, simtype):
-    """func single_simulate      :: PsatData, Str -> PsatReport
+def single_simulate(psat, simtype, clean=True):
+    """func single_simulate      :: PsatData, Str, Bool -> PsatReport
        ----
        run matlab with the PsatData `psat` as either 
        power flow (pf) or optimal power flow (opf)
        return the results of the simulation.
+       remove temp files if specified
     """
 
     title = "000"
@@ -291,19 +292,21 @@ def single_simulate(psat, simtype):
 
     # return the parsed report
     report = read_report(report_filename)
-    clean_files()
+    if clean: 
+        clean_files()
     return report
 
 
-def simulate_scenario(psat, scenario):
-    """func simulate_scenario   :: PsatData, Scenario -> PsatReport
+def simulate_scenario(psat, scenario, clean=True):
+    """func simulate_scenario   :: PsatData, Scenario, Bool -> PsatReport
        ----
        make PsatData with `scenario` and `psat`. simulate it and 
-       return the report.
+       return the report. 
+       remove temp files if specified
     """
 
     new_psat = scenario_to_psat(scenario, psat)
-    return single_simulate(new_psat, scenario.simtype)
+    return single_simulate(new_psat, scenario.simtype, clean)
 
 
 def single_matlab_script(filename, psat_filename, simtype):
@@ -424,7 +427,7 @@ def example1(n = 100):
 # example1()
 
 
-def example2(report_filename = "tmp_01.txt"):
+def example2(report_filename = "tmp.txt"):
     """test a report and actually see why if fails"""
     
     with open(report_filename) as report_file:
@@ -453,55 +456,30 @@ def example3():
 def example4():
     """one specified scenario, simulated"""
 
+    clean_files()
+    clean = False
 
     data = """
-[outage16] opf
-  remove generator 1
-  set all demand 0.5963625
-  result pass
+    [outage247] opf
+      result fail
           """
 
     scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
-    report = simulate_scenario(psat, scenario)
+    report = simulate_scenario(psat, scenario, clean)
 
     print "result = '" + str(report_in_limits(report)) + "'"
 
 
-# example4()
+example4()
 
-
-def create_base(scenario, psat):
-    """take a scenario, sim it. get the results 
-       use results to make new PsatData, return it
-    """
-    assert scenario.simtype == "opf"
-
-    # `simulate_scenario` but keep `new_psat`
-    new_psat = scenario_to_psat(scenario, psat)
-    report = single_simulate(new_psat, scenario.simtype)
-
-    assert report_in_limits(report)
-
-    # NOTE:: do I have to use the new_psat in simulate_scenario
-    #        as this might have certain things removed properly
-    #        best yet would be for report_to_psat to fail if 
-    #        the component numbers don't match. 
-
-    return report_to_psat(report, new_psat)
-    
 
 def example5():
-    prob = read_probabilities("rts.net")
-    scenario = prob.outages("000")
-    psat = read_psat("rts.m")
-    new_psat = create_base(scenario, psat)
-
-    report = single_simulate(new_psat, "pf")
-    assert report_in_limits(report)
+    pass 
 
 
 # example5()
+
 
 # -----------------------------------------------------------------------------
 
@@ -551,10 +529,10 @@ def test002():
         simulate(matlab_filename)
 
     helper("rts")
-    helper("rts2")
+    # helper("rts2")
 
 
-test002()
+# test002()
 
 
 def test003():

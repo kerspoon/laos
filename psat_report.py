@@ -220,7 +220,7 @@ class PsatReport(object):
         # print("Summary : %s" % tokens)
 
         inrange = lambda x: dec_check(x, Decimal("0.0"), Decimal("100.0"))
-        ten_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
+        ten_check = lambda x: dec_check(x, Decimal("0.0"), Decimal("10.0"))
 
         for x in range(4):
             self.ensure(inrange(x), "error : \n%s" % tokens)

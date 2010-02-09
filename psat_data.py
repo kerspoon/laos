@@ -114,6 +114,7 @@ class PsatData(object):
         self.shunts = []
         self.demand = []
         self.supply = []
+        self.mismatch = 0.0
 
     def read(self, stream):
 
@@ -177,13 +178,16 @@ class PsatData(object):
         self.busses.remove(matches[0])
 
         # kill all connecting items
-        self.lines = filter(lambda x: x.fbus != thebus and x.tbus != thebus, self.lines)
+        self.lines = filter(lambda x: x.fbus != thebus and x.tbus != thebus, 
+                            self.lines)
         
         self.slack = filter(lambda x: x.bus_no != thebus, self.slack) 
 
         assert len(self.slack) == 1, "todo: deal with deleting slack bus"
 
-        self.generators = filter(lambda x: x.bus_no != thebus, self.generators)
+        self.generators = filter(lambda x: x.bus_no != thebus,
+                                 self.generators)
+
         self.loads = filter(lambda x: x.bus_no != thebus, self.loads)
         self.shunts = filter(lambda x: x.bus_no != thebus, self.shunts)
         self.demand = filter(lambda x: x.bus_no != thebus, self.demand)
@@ -192,7 +196,8 @@ class PsatData(object):
     def remove_line(self, fbus, tbus, line_no=None):
 
         # does the given line (x) match the one we are looking for
-        test = lambda x: (x.fbus == fbus and x.tbus == tbus) or (x.fbus == tbus and x.tbus == fbus)
+        test = lambda x: ((x.fbus == fbus and x.tbus == tbus) or
+                          (x.fbus == tbus and x.tbus == fbus))
 
         # list all matches
         matches = [x for x in self.lines if test(x)]
@@ -249,8 +254,48 @@ class PsatData(object):
 #         # can't set this simply it depends on the bid price.
 #         raise Exception("not implemented")
 
+    def fix_mismatch(self):
+        """
+        changes the generators power to compensate for the imbalance caused 
+        by remove_* or set_*. It sets each generator proportionally based 
+        upon it's current generating power (though it respects generator 
+        limits). 
 
+        It does this by using `self.mismatch`
+        TODO: Not sure what to do with reactive power
+        """
+
+        dispatchable_generators = self.generators[:]
+
+
+        # set any generators that will be at their limits
+        done = False
+        while not done:
+            
+            assert(len(dispatchable_generators) != 0)
+            total_generation = sum(x.p for x in dispatchable_generators)
+            multiplier = 1.0 + (self.mismatch / total_generation)
+            assert(0 < multiplier < 2)
+
+            for generator in dispatchable_generators:
+                new_p = (multiplier * generator.p)
+                if new_p > generator.s_rating:
+
+                    # set generator to max power 
+                    generator.p = generator.s_rating
+
+                    # remove what we have now considered
+                    self.mismatch -= generator.p
+
+                    # remove it for the generators to consider
+                    # but don't do this it's slow and might be 
+                    # dangerout to 'saw the branch you're sitting on 
+                    dispatchable_generators.remove(generator)
+
+        # now set the rest of the generators knowing that we wont hit limits 
+        
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
+
 

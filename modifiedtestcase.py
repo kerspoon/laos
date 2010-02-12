@@ -44,6 +44,11 @@ class ModifiedTestCase(unittest.TestCase):
         else:
             self.fail("%s did not raise %s" % (callsig, exception))
 
+    def assertAlmostEqualList(self, list1, list2):
+        self.assertEqual(len(list1), len(list2))
+        for x, y in zip(list1, list2):
+            self.assertAlmostEqual(x, y)
+
 
 class ReadError(Exception):
     pass

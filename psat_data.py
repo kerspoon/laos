@@ -116,6 +116,7 @@ class PsatData(object):
         self.shunts = []
         self.demand = []
         self.supply = []
+        self.mismatch = 0.0 
 
     def read(self, stream):
 
@@ -253,64 +254,90 @@ class PsatData(object):
 #         # can't set this simply it depends on the bid price.
 #         raise Exception("not implemented")
 
+    def fix_mismatch(self):
+        """
+        change generator powers so that the mismatch is taking
+        into account. Keep to limits. 
+
+        TODO: make this only count scheduleable generators
+              i.e. not wind farms
+        """
+        res = fix_mismatch(
+            self.mismatch, 
+            [g.p for g in self.generators], 
+            [g.s_rating for g in self.generators])
+
+        for n in range(len(self.generators)):
+            self.generators[n].p = res[n]
+
 
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
 
-def fix_mismatch(mismatch, generators):
+def fix_mismatch(mismatch, gen_power, gen_limit):
     """
-    func fix_mismatch :: Real, [Generator] -> 
+    func fix_mismatch :: Real, [Real], [Real] -> [Real]
     
     change the total generated power by `mismatch`.
     Do this based upon current power of each generator
     taking into account its limits.
-    Modifies each generator in place.
+    Returns a list of new generator powers
+
     """
 
-    if mismatch == 0:
-        return 
+    assert(len(gen_power) == len(gen_limit))
 
-    def find_limit(gens, m):
+    if mismatch == 0:
+        return gen_power
+
+    done = [False for _ in range(len(gen_power))]
+    result = [0.0 for _ in range(len(gen_power))]
+
+    def find_limit(m):
         """find the index of the first generator that will
            be limited. or None """
-        for n,gen in enumerate(gens):
-            if gen.p * m > gen.s_rating:
-                return n
+        for n,(gp,gr) in enumerate(zip(gen_power,gen_limit)):
+            if (not done[n]) and (gp * m > gr):
+                    return n
         return None
   
-    # TODO: make this only count scheduleable generators
-    #       i.e. not wind farms
-    scheduleable_gens = generators
-  
-    # deal with each generator in that will be limited 
-    # by fixing the mismatch
+    # deal with each generator that will be limited
     while True:
-        assert(len(scheduleable_gens) != 0)
+        assert(not all(done))
   
-        total_gen = sum(x.p for x in scheduleable_gens)
+        total_gen = sum(gen_power[i] for i in range(len(done)) if not done[i])
         assert(total_gen != 0)
   
         multiplier = 1.0 + (mismatch / total_gen)
         assert(0 <= multiplier <= 2)
+        # print "multiplier", multiplier
   
-        idx_gen = find_limit(scheduleable_gens, multiplier)
+        idx_gen = find_limit(multiplier)
         if idx_gen is None:
             break
   
-        gen = scheduleable_gens[idx_gen]
-        gen.p = gen.s_rating
-        mismatch -= gen.s_rating
-        del scheduleable_gens[idx_gen]
+        # print "generator hit limit:", idx_gen
+        result[idx_gen] = gen_limit[idx_gen]
+        mismatch -= result[idx_gen] - gen_power[idx_gen]
+        done[idx_gen] = True
   
     # deal with all the other generators 
     # knowing that none of them will limit
-    for generator in scheduleable_gens:
-        generator.p *= multiplier
+    for idx in range(len(gen_power)):
+        if not done[idx]:
+            # print "set generator", idx
+            result[idx] = gen_power[idx] * multiplier
+            mismatch -= result[idx] - gen_power[idx]
+            done[idx] = True
   
     # check nothing is out of limits 
-    for generator in generators:
-        assert(generator.p <= generator.s_rating)
+    for idx in range(len(gen_power)):
+        assert(gen_power[idx] <= gen_limit[idx])
+    assert mismatch < 0.001
+    assert all(done)
+    
+    return result
 
 #------------------------------------------------------------------------------
 #
@@ -318,39 +345,38 @@ def fix_mismatch(mismatch, generators):
 
 class Test_fix_mismatch(ModifiedTestCase):
 
-    # func fix_mismatch :: Real, [Generator] -> None 
-
-    class MockGenerator(object):
-        def __init__(self, p, s_rating):
-            self.p = p
-            self.s_rating = s_rating
-
-    def util_make_gens(self, p_list, rating):
-        return [Test_fix_mismatch.MockGenerator(p,rating) for p in p_list]
-
-    def util_powers(self, generators):
-        return [g.p for g in generators]
-
     def test_1(self):
         p_list = [1, 1, 1, 1, 1]
-        generators = self.util_make_gens(p_list, 10)
+        r_list = [2, 2, 2, 2, 2]
 
-        fix_mismatch(0, generators)
-
-        self.assertEqual(len(generators), len(p_list))
-
-        for p1, p2 in zip(p_list, self.util_powers(generators)):
-            self.assertEqual(p1, p2)
+        res = fix_mismatch(0, p_list, r_list)
+        self.assertAlmostEqualList(res, p_list)
       
     def test_2(self):
         p_list = [1, 1]
-        generators = self.util_make_gens(p_list, 10)
-        fix_mismatch(1, generators)
+        r_list = [2, 2]
+        res = fix_mismatch(1.0, p_list, r_list)
 
-        results_list = [1.5, 1.5]
-        for p1, p2 in zip(results_list, self.util_powers(generators)):
-            self.assertAlmostEqual(p1, p2)
+        self.assertAlmostEqualList(res, [1.5, 1.5])
 
+    def test_3(self):
+        p_list = [1, 0, 1]
+        r_list = [2, 2, 2]
+        res = fix_mismatch(1.0, p_list, r_list)
+
+        self.assertAlmostEqualList(res, [1.5, 0, 1.5])
+
+    def test_4(self):
+        p_list = [2, 4]
+        r_list = [8, 8]
+        res = fix_mismatch(3.0, p_list, r_list)
+        self.assertAlmostEqualList(res, [3, 6])
+
+    def test_5(self):
+        p_list = [2, 4]
+        r_list = [8, 5]
+        res = fix_mismatch(3.0, p_list, r_list)
+        self.assertAlmostEqualList(res, [4, 5])
 
 if __name__ == '__main__':
 # if True:

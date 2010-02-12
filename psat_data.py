@@ -29,6 +29,8 @@ psat_data.py - PsatData - psat_file - psat
 
 from misc import struct, read_struct
 import re
+import unittest
+from modifiedtestcase import ModifiedTestCase
 
 #------------------------------------------------------------------------------
 #
@@ -177,7 +179,8 @@ class PsatData(object):
         self.busses.remove(matches[0])
 
         # kill all connecting items
-        self.lines = filter(lambda x: x.fbus != thebus and x.tbus != thebus, self.lines)
+        self.lines = filter(lambda x: x.fbus != thebus and 
+                            x.tbus != thebus, self.lines)
         
         self.slack = filter(lambda x: x.bus_no != thebus, self.slack) 
 
@@ -192,7 +195,8 @@ class PsatData(object):
     def remove_line(self, fbus, tbus, line_no=None):
 
         # does the given line (x) match the one we are looking for
-        test = lambda x: (x.fbus == fbus and x.tbus == tbus) or (x.fbus == tbus and x.tbus == fbus)
+        test = lambda x: ((x.fbus == fbus and x.tbus == tbus) 
+                          or (x.fbus == tbus and x.tbus == fbus))
 
         # list all matches
         matches = [x for x in self.lines if test(x)]
@@ -253,4 +257,102 @@ class PsatData(object):
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
+
+def fix_mismatch(mismatch, generators):
+    """
+    func fix_mismatch :: Real, [Generator] -> 
+    
+    change the total generated power by `mismatch`.
+    Do this based upon current power of each generator
+    taking into account its limits.
+    Modifies each generator in place.
+    """
+
+    if mismatch == 0:
+        return 
+
+    def find_limit(gens, m):
+        """find the index of the first generator that will
+           be limited. or None """
+        for n,gen in enumerate(gens):
+            if gen.p * m > gen.s_rating:
+                return n
+        return None
+  
+    # TODO: make this only count scheduleable generators
+    #       i.e. not wind farms
+    scheduleable_gens = generators
+  
+    # deal with each generator in that will be limited 
+    # by fixing the mismatch
+    while True:
+        assert(len(scheduleable_gens) != 0)
+  
+        total_gen = sum(x.p for x in scheduleable_gens)
+        assert(total_gen != 0)
+  
+        multiplier = 1.0 + (mismatch / total_gen)
+        assert(0 <= multiplier <= 2)
+  
+        idx_gen = find_limit(scheduleable_gens, multiplier)
+        if idx_gen is None:
+            break
+  
+        gen = scheduleable_gens[idx_gen]
+        gen.p = gen.s_rating
+        mismatch -= gen.s_rating
+        del scheduleable_gens[idx_gen]
+  
+    # deal with all the other generators 
+    # knowing that none of them will limit
+    for generator in scheduleable_gens:
+        generator.p *= multiplier
+  
+    # check nothing is out of limits 
+    for generator in generators:
+        assert(generator.p <= generator.s_rating)
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+class Test_fix_mismatch(ModifiedTestCase):
+
+    # func fix_mismatch :: Real, [Generator] -> None 
+
+    class MockGenerator(object):
+        def __init__(self, p, s_rating):
+            self.p = p
+            self.s_rating = s_rating
+
+    def util_make_gens(self, p_list, rating):
+        return [Test_fix_mismatch.MockGenerator(p,rating) for p in p_list]
+
+    def util_powers(self, generators):
+        return [g.p for g in generators]
+
+    def test_1(self):
+        p_list = [1, 1, 1, 1, 1]
+        generators = self.util_make_gens(p_list, 10)
+
+        fix_mismatch(0, generators)
+
+        self.assertEqual(len(generators), len(p_list))
+
+        for p1, p2 in zip(p_list, self.util_powers(generators)):
+            self.assertEqual(p1, p2)
+      
+    def test_2(self):
+        p_list = [1, 1]
+        generators = self.util_make_gens(p_list, 10)
+        fix_mismatch(1, generators)
+
+        results_list = [1.5, 1.5]
+        for p1, p2 in zip(results_list, self.util_powers(generators)):
+            self.assertAlmostEqual(p1, p2)
+
+
+if __name__ == '__main__':
+# if True:
+    unittest.main()
 

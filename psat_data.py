@@ -130,27 +130,37 @@ class PsatData(object):
             if len(line) == 0 or line.startswith("#"):
                 continue
             elif title_matches(line, "Bus.con"):
+                assert len(self.busses) == 0
                 read_section(stream, self.busses, self.Bus)
                 assert len(self.busses) >= 1
+                for idx in len(self.busses):
+                    assert self.busses[idx-1].bus_no == idx
             elif title_matches(line, "Line.con"):
+                assert len(self.lines) == 0
                 read_section(stream, self.lines, self.Line)
                 assert len(self.lines) >= 1
             elif title_matches(line, "SW.con"):
+                assert len(self.slack) == 0
                 read_section(stream, self.slack, self.Slack)
                 assert len(self.slack) == 1
             elif title_matches(line, "PV.con"):
+                assert len(self.generators) == 0
                 read_section(stream, self.generators, self.Generator)
                 assert len(self.generators) >= 0
             elif title_matches(line, "PQ.con"):
+                assert len(self.loads) == 0
                 read_section(stream, self.loads, self.Load)
                 assert len(self.loads) >= 1
             elif title_matches(line, "Shunt.con"):
+                assert len(self.shunts) == 0
                 read_section(stream, self.shunts, self.Shunt)
                 assert len(self.shunts) >= 0
             elif title_matches(line, "Demand.con"):
+                assert len(self.demand) == 0
                 read_section(stream, self.demand, self.Demand)
                 assert len(self.demand) >= 0 
             elif title_matches(line, "Supply.con"):
+                assert len(self.supply) == 0
                 read_section(stream, self.supply, self.Supply)
                 assert len(self.supply) >= 0
             else:
@@ -168,75 +178,56 @@ class PsatData(object):
 
     def remove_bus(self, bus_no):
 
-        # list all matches
-        matches = [x for x in self.busses if x.bus_no == bus_no]
-
-        # bus names must be unique
-        assert len(matches) != 0, "Unable to find bus: " + str(bus_no)
-        assert len(matches) == 1
-        
-        # remove it 
-        thebus = matches[0].bus_no
-        self.busses.remove(matches[0])
+        assert self.busses[bus_no-1].bus_no == bus_no
+        del self.busses[bus_no-1]
 
         # kill all connecting items
-        self.lines = filter(lambda x: x.fbus != thebus and 
-                            x.tbus != thebus, self.lines)
-        
-        self.slack = filter(lambda x: x.bus_no != thebus, self.slack) 
+        # TODO: set mismatch for connecting stuff 
 
+        kill_lines = [n for n, x in self.lines 
+                      if x.fbus == bus_no-1 or x.tbus == bus_no-1]
+
+        for line in kill_lines:
+            self.remove_line(line, 
+                             self.lines[line].fbus,
+                             self.lines[line].tbus)
+
+
+        self.slack = filter(lambda x: x.bus_no != bus_no-1, self.slack) 
         assert len(self.slack) == 1, "todo: deal with deleting slack bus"
 
-        self.generators = filter(lambda x: x.bus_no != thebus, self.generators)
-        self.loads = filter(lambda x: x.bus_no != thebus, self.loads)
-        self.shunts = filter(lambda x: x.bus_no != thebus, self.shunts)
-        self.demand = filter(lambda x: x.bus_no != thebus, self.demand)
-        self.supply = filter(lambda x: x.bus_no != thebus, self.supply)
+        self.generators = filter(lambda x: x.bus_no != bus_no-1,
+                                 self.generators)
 
-    def remove_line(self, fbus, tbus, line_no=None):
+        self.loads = filter(lambda x: x.bus_no != bus_no-1, self.loads)
+        self.shunts = filter(lambda x: x.bus_no != bus_no-1, self.shunts)
+        self.demand = filter(lambda x: x.bus_no != bus_no-1, self.demand)
+        self.supply = filter(lambda x: x.bus_no != bus_no-1, self.supply)
 
-        # does the given line (x) match the one we are looking for
-        test = lambda x: ((x.fbus == fbus and x.tbus == tbus) 
-                          or (x.fbus == tbus and x.tbus == fbus))
+    def remove_line(self, line_id, fbus, tbus):
+        assert self.lines[line_id].fbus == fbus
+        assert self.lines[line_id].tbus == tbus
+        del self.lines[line_id]
+        # TODO:: deal with islanding
 
-        # list all matches
-        matches = [x for x in self.lines if test(x)]
-
-        # remove it 
-        self.remove_item(matches, self.lines, line_no, (fbus, tbus))
-            
-    def remove_generator(self, bus_no, gen_no=None):
+    def remove_generator(self, supply_id, bus_no):
+        """kill the specified supply and reduce the corosponding 
+           PV element (self.generators) by the correct amount"""
         
-        # todo: deal with only deleting part of generators but 
-        #       all of one supply 
+        assert self.supply[supply_id].bus_no == bus_no
+        del self.supply[supply_id]
 
-        # list all matches
-        gen_matches = [x for x in self.generators if x.bus_no == bus_no]
-        supply_matches = [x for x in self.supply if x.bus_no == bus_no]
+        gens = [n for n,x in enumerate(self.generators) 
+                    if x.bus_no == bus_no]
+        assert len(gens) == 1
+        gen_id = gens[0]
 
-        # remove it 
-        self.remove_item(gen_matches, self.generators, gen_no, bus_no)
-        self.remove_item(supply_matches, self.supply, gen_no, bus_no)
-        
-    def remove_item(self, matches, iterable, item_no, bus_no):
-
-        # error if no matches 
-        assert len(matches) != 0, "Unable to find item: " + str(bus_no)
-
-        # simple if one match 
-        if len(matches) == 1:
-            iterable.remove(matches[0])
-        # remove only one if there is more
-        elif len(matches) > 1:
-            # if line number specified use that
-            if item_no:
-                assert item_no < len(matches)
-                iterable.remove(matches[item_no])
-            # otherwise remove first
-            else:
-                iterable.remove(matches[0])
-        else:
-            raise Exception("can't happen")
+        # TODO set-up mini pool system for deciding power of each gen 
+        # for now assume they distributed power equally.
+        num_units = len(x for x in self.supply if x.bus_no == bus_no)
+        unit_power = self.generators[gen_id].p / num_units
+        self.mismatch -= unit_power
+        self.generators[gen_id].p -= unit_power
 
     def set_all_demand(self, value):
         for load in self.loads:
@@ -378,7 +369,56 @@ class Test_fix_mismatch(ModifiedTestCase):
         res = fix_mismatch(3.0, p_list, r_list)
         self.assertAlmostEqualList(res, [4, 5])
 
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+class Test_killstuff(ModifiedTestCase):
+
+    def setUp(self):
+        self.pd = PsatData()
+
+        self.lines = [
+            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1",
+            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1",
+            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1",
+            "1 5 100 138 60 0.0 0.0 0.0218 0.0845 0.0229 0.0 0.0 2.08 0.0 2.2 1",
+            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1"]
+
+        for line in self.lines:
+            self.pd.lines.append(read_struct(PsatData.Line, line.split()))
+ 
+    def test_1(self):
+        self.pd.remove_line(0, 1, 2)
+        self.assertEqual(
+            [str(x) for x in self.pd.lines],
+            self.lines[1:])
+
+    def test_2(self):
+        self.pd.remove_line(1, 1, 3)
+        self.assertEqual(
+            [str(x) for x in self.pd.lines],
+            [self.lines[0]] + self.lines[2:])
+
+    def test_3(self):
+        self.pd.remove_line(2, 1, 3)
+        self.assertEqual(
+            [str(x) for x in self.pd.lines],
+            self.lines[:2] + self.lines[3:])
+
+    def test_4(self):
+        self.pd.remove_line(2, 1, 3)
+        self.pd.remove_line(4, 2, 4)
+        self.assertEqual(
+            [str(x) for x in self.pd.lines],
+            self.lines[:1] + [self.lines[3]])
+
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
 if __name__ == '__main__':
 # if True:
     unittest.main()
-

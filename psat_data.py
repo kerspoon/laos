@@ -334,6 +334,7 @@ def fix_mismatch(mismatch, gen_power, gen_limit):
 #
 #------------------------------------------------------------------------------
 
+
 class Test_fix_mismatch(ModifiedTestCase):
 
     def test_1(self):
@@ -347,14 +348,12 @@ class Test_fix_mismatch(ModifiedTestCase):
         p_list = [1, 1]
         r_list = [2, 2]
         res = fix_mismatch(1.0, p_list, r_list)
-
         self.assertAlmostEqualList(res, [1.5, 1.5])
 
     def test_3(self):
         p_list = [1, 0, 1]
         r_list = [2, 2, 2]
         res = fix_mismatch(1.0, p_list, r_list)
-
         self.assertAlmostEqualList(res, [1.5, 0, 1.5])
 
     def test_4(self):
@@ -374,18 +373,17 @@ class Test_fix_mismatch(ModifiedTestCase):
 #
 #------------------------------------------------------------------------------
 
+
 class Test_killstuff(ModifiedTestCase):
 
     def setUp(self):
         self.pd = PsatData()
-
         self.lines = [
             "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1",
             "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1",
             "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1",
             "1 5 100 138 60 0.0 0.0 0.0218 0.0845 0.0229 0.0 0.0 2.08 0.0 2.2 1",
             "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1"]
-
         for line in self.lines:
             self.pd.lines.append(read_struct(PsatData.Line, line.split()))
  
@@ -419,6 +417,7 @@ class Test_killstuff(ModifiedTestCase):
 #
 #------------------------------------------------------------------------------
 
+
 if __name__ == '__main__':
-# if True:
     unittest.main()
+

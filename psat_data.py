@@ -44,7 +44,7 @@ def write_section(stream, items, title):
         return
 
     stream.write(title + ".con = [ ... \n")
-    for key, value in sorted(d.items()):
+    for key, value in sorted(items.items()):
         stream.write("  " + str(value) + ";\n")
     stream.write(" ];\n")
 
@@ -131,10 +131,18 @@ class PsatData(object):
                 continue
             elif title_matches(line, "Bus.con"):
                 assert len(self.busses) == 0
-                read_section(stream, self.busses, self.Bus)
+
+                # silly little hack to get busses[id].bus_no == id
+                tmp = {}
+                read_section(stream, tmp, self.Bus)
+                for bus in tmp.values():
+                    self.busses[bus.bus_no] = bus
+
+                # make sure that hack worked
                 assert len(self.busses) >= 1
-                for idx in len(self.busses):
-                    assert self.busses[idx-1].bus_no == idx
+                for idx,bus in self.busses.items():
+                    assert bus.bus_no == idx, str(bus.bus_no) + " " + str(idx)
+
             elif title_matches(line, "Line.con"):
                 assert len(self.lines) == 0
                 read_section(stream, self.lines, self.Line)

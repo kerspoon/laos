@@ -221,12 +221,13 @@ class PsatReport(object):
 
         inrange = lambda x: dec_check(x, Decimal("0.0"), Decimal("100.0"))
         ten_check = lambda x: dec_check(x, Decimal("0.0"), Decimal("10.0"))
+        ten_neg_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
 
         for x in range(4):
             self.ensure(inrange(x), "error : \n%s" % tokens)
 
         self.ensure(ten_check(tokens[4]), "error : \n%s" % tokens)
-        self.ensure(ten_check(tokens[5]), "error : \n%s" % tokens)
+        self.ensure(ten_neg_check(tokens[5]), "error : \n%s" % tokens)
 
     def process_limits(self, tokens):
         # print("Limits : %s" % tokens)

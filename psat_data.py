@@ -182,27 +182,36 @@ class PsatData(object):
         del self.busses[bus_no-1]
 
         # kill all connecting items
-        # TODO: set mismatch for connecting stuff 
+        for idx, shunt in self.shunts.items():
+            if shunt.bus_no == bus_no-1:
+                del self.shunts[idx]
 
-        kill_lines = [n for n, x in self.lines 
-                      if x.fbus == bus_no-1 or x.tbus == bus_no-1]
+        for idx, item in self.demand.items():
+            if item.bus_no == bus_no-1:
+                del self.demand[idx]
 
-        for line in kill_lines:
-            self.remove_line(line, 
-                             self.lines[line].fbus,
-                             self.lines[line].tbus)
+        for idx, item in self.supply.items():
+            if item.bus_no == bus_no-1:
+                del self.supply[idx]
 
+        for idx, line in self.lines.items():
+            if line.fbus == bus_no-1 or line.tbus == bus_no-1:
+                self.remove_line(idx, 
+                                 line.fbus,
+                                 line.tbus)
 
-        self.slack = filter(lambda x: x.bus_no != bus_no-1, self.slack) 
-        assert len(self.slack) == 1, "todo: deal with deleting slack bus"
+        for idx, gen in self.generators.items():
+            if gen.bus_no == bus_no-1:
+                self.mismatch -= gen.p
+                del self.generators[idx]
 
-        self.generators = filter(lambda x: x.bus_no != bus_no-1,
-                                 self.generators)
+        for idx, load in self.loads.items():
+            if load.bus_no == bus_no-1:
+                self.mismatch += load.p
+                del self.load[idx]
 
-        self.loads = filter(lambda x: x.bus_no != bus_no-1, self.loads)
-        self.shunts = filter(lambda x: x.bus_no != bus_no-1, self.shunts)
-        self.demand = filter(lambda x: x.bus_no != bus_no-1, self.demand)
-        self.supply = filter(lambda x: x.bus_no != bus_no-1, self.supply)
+        assert len(self.slack) == 1
+        assert self.slack[0].bus_no != bus_no-1, "todo: deal with deleting slack bus"
 
     def remove_line(self, line_id, fbus, tbus):
         assert self.lines[line_id].fbus == fbus

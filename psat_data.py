@@ -178,40 +178,40 @@ class PsatData(object):
 
     def remove_bus(self, bus_no):
 
-        assert self.busses[bus_no-1].bus_no == bus_no
-        del self.busses[bus_no-1]
+        assert self.busses[bus_no].bus_no == bus_no
+        del self.busses[bus_no]
 
         # kill all connecting items
         for idx, shunt in self.shunts.items():
-            if shunt.bus_no == bus_no-1:
+            if shunt.bus_no == bus_no:
                 del self.shunts[idx]
 
         for idx, item in self.demand.items():
-            if item.bus_no == bus_no-1:
+            if item.bus_no == bus_no:
                 del self.demand[idx]
 
         for idx, item in self.supply.items():
-            if item.bus_no == bus_no-1:
+            if item.bus_no == bus_no:
                 del self.supply[idx]
 
         for idx, line in self.lines.items():
-            if line.fbus == bus_no-1 or line.tbus == bus_no-1:
+            if line.fbus == bus_no or line.tbus == bus_no:
                 self.remove_line(idx, 
                                  line.fbus,
                                  line.tbus)
 
         for idx, gen in self.generators.items():
-            if gen.bus_no == bus_no-1:
+            if gen.bus_no == bus_no:
                 self.mismatch -= gen.p
                 del self.generators[idx]
 
         for idx, load in self.loads.items():
-            if load.bus_no == bus_no-1:
+            if load.bus_no == bus_no:
                 self.mismatch += load.p
                 del self.load[idx]
 
         assert len(self.slack) == 1
-        assert self.slack[0].bus_no != bus_no-1, "todo: deal with deleting slack bus"
+        assert self.slack[0].bus_no != bus_no, "todo: deal with deleting slack bus"
 
     def remove_line(self, line_id, fbus, tbus):
         assert self.lines[line_id].fbus == fbus
@@ -499,6 +499,88 @@ class Test_kill_generator(ModifiedTestCase):
             ["1 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1",
              "2 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1"] + self.generators[2:])
 
+
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
+class Test_kill_bus(ModifiedTestCase):
+
+    def setUp(self):
+        self.pd = PsatData()
+        self.busses = [
+            "1 138 1.0 0.0 2 1",
+            "2 138 1.0 0.0 2 1",
+            "3 138 1.0 0.0 2 1",
+            "4 138 1.0 0.0 2 1"]
+        self.lines = [
+            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1",
+            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1",
+            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1",
+            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1"]
+        self.supply = [
+            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
+            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
+            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
+            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
+            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
+            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
+            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
+            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"]
+        self.generators = [
+            "1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1",
+            "2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1"]
+
+        for n,item in enumerate(self.supply):
+            self.pd.supply[n] = read_struct(PsatData.Supply, item.split())
+ 
+        for n,item in enumerate(self.generators):
+            self.pd.generators[n] = read_struct(PsatData.Generator, item.split())
+ 
+        for n,item in enumerate(self.busses):
+            self.pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
+
+        for n,line in enumerate(self.lines):
+            self.pd.lines[n] = read_struct(PsatData.Line, line.split())
+
+        self.pd.slack[0] = read_struct(
+            PsatData.Slack,
+            "13 100 230 1.02 0 2.4 0 1.05 0.95 4.7321 1 1 1".split())
+
+    def util_pprint(self, collection):
+        return [str(value) for key, value in sorted(collection.items())]
+                
+    def test_1(self):
+        self.assertEqual(
+            self.util_pprint(self.pd.busses),
+            self.busses)
+        self.assertEqual(
+            self.util_pprint(self.pd.lines),
+            self.lines)
+        self.assertEqual(
+            self.util_pprint(self.pd.supply),
+            self.supply)
+        self.assertEqual(
+            self.util_pprint(self.pd.generators),
+            self.generators)
+
+    def test_2(self):
+        self.pd.remove_bus(1)
+        self.assertEqual(
+            self.util_pprint(self.pd.busses),
+            self.busses[1:])
+        self.assertEqual(
+            self.util_pprint(self.pd.lines),
+            [self.lines[3]])
+        self.assertEqual(
+            self.util_pprint(self.pd.supply),
+            self.supply[4:])
+        self.assertEqual(
+            self.util_pprint(self.pd.generators),
+            self.generators[1:])
+
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
@@ -506,3 +588,4 @@ class Test_kill_generator(ModifiedTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

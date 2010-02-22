@@ -201,15 +201,20 @@ def scenario_to_psat(scenario, psat):
     new_psat = deepcopy(psat)
 
     for kill in scenario.kill["bus"]:
-        new_psat.remove_bus(kill)
+        print kill
+        # new_psat.remove_bus(kill)
     for kill in scenario.kill["line"]:
-        new_psat.remove_line(kill[0], kill[1])
+        print kill
+        # new_psat.remove_line(kill[0], kill[1])
     for kill in scenario.kill["generator"]:
-        new_psat.remove_generator(kill)
+        print kill
+        # new_psat.remove_generator(kill)
     if scenario.all_supply:
-        new_psat.set_all_supply(scenario.all_supply)
+        print scenario.all_supply
+        # new_psat.set_all_supply(scenario.all_supply)
     if scenario.all_demand:
-        new_psat.set_all_demand(scenario.all_demand)
+        print scenario.all_demand
+        # new_psat.set_all_demand(scenario.all_demand)
     if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
         raise Exception("not implemented")
 
@@ -457,7 +462,7 @@ def example4():
     """one specified scenario, simulated"""
 
     clean_files()
-    clean = False
+    clean = True
 
     data = """
     [outage247] opf

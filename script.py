@@ -93,6 +93,7 @@ def read_file(filename, datatype):
         data.read(thefile)
         return data
 
+
 def read_probabilities(filename):
     """func read_probabilities   :: Str -> NetworkProbability
        ----
@@ -145,7 +146,7 @@ def report_to_psat(report, psat):
     """
 
 
-    print "WARING ADD THESE LINES BACK IN"
+    print "WARNING: ADD THESE LINES BACK IN"
 
     # assert len(psat.lines) == report.num_line
     # assert len(psat.slack) == 1
@@ -201,19 +202,18 @@ def scenario_to_psat(scenario, psat):
     new_psat = deepcopy(psat)
 
     for kill in scenario.kill["bus"]:
-        print kill
-        # new_psat.remove_bus(kill)
+        new_psat.remove_bus(kill)
     for kill in scenario.kill["line"]:
         print kill
-        # new_psat.remove_line(kill[0], kill[1])
+        # new_psat.remove_line(kill)
     for kill in scenario.kill["generator"]:
         print kill
         # new_psat.remove_generator(kill)
     if scenario.all_supply:
-        print scenario.all_supply
+        print kill
         # new_psat.set_all_supply(scenario.all_supply)
     if scenario.all_demand:
-        print scenario.all_demand
+        print kill
         # new_psat.set_all_demand(scenario.all_demand)
     if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
         raise Exception("not implemented")
@@ -270,6 +270,7 @@ def batch_simulate(batch, psat, size=10):
         timer_time = (timer_end-timer_start)
         print "batch time of", int(math.ceil(timer_time)), "seconds"
     clean_files()
+
 
 def single_simulate(psat, simtype, clean=True):
     """func single_simulate      :: PsatData, Str, Bool -> PsatReport
@@ -466,6 +467,7 @@ def example4():
 
     data = """
     [outage247] opf
+      remove bus 1
       result fail
           """
 
@@ -487,35 +489,6 @@ def example5():
 
 
 # -----------------------------------------------------------------------------
-
-
-def test001():
-    """
-    make a system that has 2 generating units on one bus 
-    delete one at a time.
-    """
-
-    from psat_data import read_section
-
-    psat = PsatData()
-    assert len(psat.generators) == 0
-    
-    text = """
-  1  100  138  1.72  1.035  0.8  -0.5  1.05  0.95  1  1;
-  2  100  138  1.72  1.035  0.8  -0.5  1.05  0.95  1  1;
-
-    """
-
-    with closing(StringIO(text)) as stream:
-        read_section(stream, psat.generators, psat.Generator)
-
-    assert len(psat.generators) == 3
-
-    psat.remove_generator(1)
-    assert len(psat.generators) == 2
-
-    psat.remove_generator(1)
-    assert len(psat.generators) == 1
 
 
 def test002():

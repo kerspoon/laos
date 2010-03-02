@@ -227,11 +227,14 @@ class PsatData(object):
         del self.lines[line_id]
         # TODO:: deal with islanding
 
-    def remove_generator(self, supply_id, bus_no):
+    def remove_generator(self, supply_id, bus_no=None):
         """kill the specified supply and reduce the corosponding 
            PV element (self.generators) by the correct amount"""
         
-        assert self.supply[supply_id].bus_no == bus_no
+        if bus_no:
+            assert self.supply[supply_id].bus_no == bus_no
+        else:
+            bus_no = self.supply[supply_id].bus_no
 
         gens = [n for n,x in enumerate(self.generators.values()) 
                     if x.bus_no == bus_no]
@@ -271,6 +274,10 @@ class PsatData(object):
         TODO: make this only count scheduleable generators
               i.e. not wind farms
         """
+
+        if self.mismatch == 0:
+            return
+
         res = fix_mismatch(
             self.mismatch, 
             [g.p for g in self.generators], 

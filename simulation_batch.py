@@ -154,13 +154,13 @@ class SimulationBatch(object):
             elif line[0] == "remove":
                 if line[1] == "bus":
                     bus_no = int(line[2])
-                    add_kill("bus",bus_no)
+                    add_kill("bus", bus_no)
                 elif line[1] == "line":
                     name = line[2]
                     add_kill("line", name)
                 elif line[1] == "generator":
                     name = line[2]
-                    add_kill("generator",name)
+                    add_kill("generator", name)
                 else:
                     raise Exception("got %s expected (line, generator, bus)" 
                                     % line[1])
@@ -223,8 +223,23 @@ class Test_read(ModifiedTestCase):
 """)
         self.util_readwrite_match(
             """[name123] pf
-  remove line A4
+  remove line a4
 """)
+        self.util_readwrite_match(
+            """[name123] pf
+  remove generator g10
+""")
+        self.util_readwrite_match(
+            """[name123] pf
+  remove line a9
+  remove generator g11
+""")
+        self.util_readwrite_match(
+            """[name123] pf
+  set all demand 0.86
+  result fail
+""")
+
 
 #------------------------------------------------------------------------------
 #
@@ -233,6 +248,7 @@ class Test_read(ModifiedTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
 
 #------------------------------------------------------------------------------
 #

@@ -54,7 +54,7 @@ class Scenario(object):
         for kill in self.kill["bus"]:
             stream.write("  remove bus " + str(kill) + "\n")
         for kill in self.kill["line"]:
-            stream.write("  remove line " + as_csv(kill, " ") + "\n")
+            stream.write("  remove line " + str(kill) + "\n")
         for kill in self.kill["generator"]:
             stream.write("  remove generator " + str(kill) + "\n")
         if self.all_supply:
@@ -156,12 +156,11 @@ class SimulationBatch(object):
                     bus_no = int(line[2])
                     add_kill("bus",bus_no)
                 elif line[1] == "line":
-                    fbus = int(line[2])
-                    tbus = int(line[3])
-                    add_kill("line", (fbus, tbus))
+                    name = line[2]
+                    add_kill("line", name)
                 elif line[1] == "generator":
-                    bus_no = int(line[2])
-                    add_kill("generator",bus_no)
+                    name = line[2]
+                    add_kill("generator",name)
                 else:
                     raise Exception("got %s expected (line, generator, bus)" 
                                     % line[1])

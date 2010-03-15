@@ -215,7 +215,7 @@ class PsatData(object):
         for idx, load in self.loads.items():
             if load.bus_no == bus_no:
                 self.mismatch += load.p
-                del self.load[idx]
+                del self.loads[idx]
 
         assert len(self.slack) == 1
         assert self.slack[0].bus_no != bus_no, "todo: deal with deleting slack bus"
@@ -250,7 +250,7 @@ class PsatData(object):
         self.generators[gen_id].p -= unit_power
 
     def set_all_demand(self, value):
-        for load in self.loads:
+        for load in self.loads.values():
             # Note:: should I change P, Q or both. 
             load.p *= value
 

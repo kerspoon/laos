@@ -537,7 +537,7 @@ class Test_kill_bus(ModifiedTestCase):
             "4 138 1 0 2 1"]
 
         for n, item in enumerate(busses):
-            pd.busses[n] = read_struct(PsatData.Bus, item.split())
+            pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
 
         pd.remove_bus(1)
 
@@ -552,7 +552,7 @@ class Test_kill_bus(ModifiedTestCase):
             "4 138 1 0 2 1"]
         
         for n, item in enumerate(busses):
-            pd.busses[n] = read_struct(PsatData.Bus, item.split())
+            pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
 
         pd.remove_bus(2)
 

@@ -37,14 +37,15 @@ Classes
     func read_batch           :: Str -> SimulationBatch
     func read_report          :: Str -> PsatReport
 
+    func report_in_limits     :: PsatReport -> Str
+
     func report_to_psat       :: PsatReport, PsatData -> PsatData
     func text_to_scenario     :: Str -> Scenario
     func scenario_to_psat     :: Scenario, PsatData -> PsatData
 
     func batch_simulate       :: SimulationBatch, PsatData, Int -> 
-    func single_simulate      :: PsatData, Str -> PsatReport
-    func simulate_scenario    :: PsatData, Scenario -> PsatReport
-    func report_in_limits     :: PsatReport -> Str
+    func single_simulate      :: PsatData, Str, Bool -> PsatReport
+    func simulate_scenario    :: PsatData, Scenario, Bool -> PsatReport
 
     func single_matlab_script :: Str, Str, Str -> 
     func batch_matlab_script  :: Str, SimulationBatch -> 
@@ -54,17 +55,15 @@ Classes
       """
       matlab psat data file used in simulations.
       components can be removed to create specific scenarios though
-      the recommended way is through the 'write_scenario' func.
+      the recommended way is through the script.py helper
       """
       func read             :: istream(psat_file) -> 
       func write            :: ostream(psat_file) ->
       func remove_bus       :: int(>0) ->
-      func remove_line      :: int(>0), int(>0), Either(None, int(>0)) -> 
-      func remove_generator :: int(>0), Either(None, int(>0)) -> 
+      func remove_line      :: int(>0), int(>0), int(>0) -> 
+      func remove_generator :: int(>0), int(>0) -> 
       func set_all_demand   :: real(>0) -> 
-      func set_all_supply   :: real(>0) -> 
-      func set_demand       :: int(>0), real(>0) -> 
-      func set_supply       :: int(>0), real(>0) -> 
+      func fix_mismatch     :: ->
       class Bus
       class Line
       class Slack
@@ -108,9 +107,8 @@ Classes
       class LineFlow
       func in_limit :: -> Bool
       func read     :: istream(report_file) -> 
-      func write    :: ostream(report_file) ->
       
-      
+
 File Types
 ==========
 

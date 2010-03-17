@@ -204,9 +204,9 @@ class NetworkProbability(object):
     def outages(self, name):
         scen = Scenario("outage" + name, "opf")
         scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pout)]
-        scen.kill["line"] = [(line.fbus, line.tbus) for line in 
+        scen.kill["line"] = [line.name for line in 
                              self.lines if fail(line.pout)]
-        scen.kill["generator"] = [generator.bus_id for generator in 
+        scen.kill["generator"] = [generator.name for generator in 
                                   self.generators if fail(generator.pout)]
         scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
         scen.all_demand = buslevel.random_bus_forecast()
@@ -215,9 +215,9 @@ class NetworkProbability(object):
     def failures(self, name):
         scen = Scenario("failure" + name, "pf")
         scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pfail)]
-        scen.kill["line"] = [(line.fbus, line.tbus) for line in 
+        scen.kill["line"] = [line.name for line in 
                              self.lines if fail(line.pfail)]
-        scen.kill["generator"] = [generator.bus_id for generator in 
+        scen.kill["generator"] = [generator.name for generator in 
                                   self.generators if fail(generator.pfail)]
         scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
 

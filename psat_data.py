@@ -116,7 +116,7 @@ class PsatData(object):
         self.shunts = {}
         self.demand = {}
         self.supply = {}
-        self.mismatch = 0.0 
+        self.mismatch = 0.0
 
     def read(self, stream):
 
@@ -215,7 +215,7 @@ class PsatData(object):
         for idx, load in self.loads.items():
             if load.bus_no == bus_no:
                 self.mismatch += load.p
-                del self.load[idx]
+                del self.loads[idx]
 
         assert len(self.slack) == 1
         assert self.slack[0].bus_no != bus_no, "todo: deal with deleting slack bus"
@@ -250,7 +250,7 @@ class PsatData(object):
         self.generators[gen_id].p -= unit_power
 
     def set_all_demand(self, value):
-        for load in self.loads:
+        for load in self.loads.values():
             # Note:: should I change P, Q or both. 
             load.p *= value
 
@@ -267,9 +267,13 @@ class PsatData(object):
 
     def fix_mismatch(self):
         """
-        change generator powers so that the mismatch is taking
-        into account. Keep to limits. 
+        Changes the generators power to compensate for the imbalance caused 
+        by remove_* or set_*. It sets each generator proportionally based 
+        upon it's current generating power (though it respects generator 
+        limits). 
 
+        It does this by using `self.mismatch`
+        TODO: Not sure what to do with reactive power
         TODO: make this only count scheduleable generators
               i.e. not wind farms
         """
@@ -289,6 +293,7 @@ class PsatData(object):
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
+
 
 def fix_mismatch(mismatch, gen_power, gen_limit):
     """
@@ -544,7 +549,7 @@ class Test_kill_bus(ModifiedTestCase):
             "4 138 1 0 2 1"]
 
         for n, item in enumerate(busses):
-            pd.busses[n] = read_struct(PsatData.Bus, item.split())
+            pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
 
         pd.remove_bus(1)
 
@@ -559,7 +564,7 @@ class Test_kill_bus(ModifiedTestCase):
             "4 138 1 0 2 1"]
         
         for n, item in enumerate(busses):
-            pd.busses[n] = read_struct(PsatData.Bus, item.split())
+            pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
 
         pd.remove_bus(2)
 

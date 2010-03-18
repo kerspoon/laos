@@ -202,22 +202,25 @@ def scenario_to_psat(scenario, psat):
     new_psat = deepcopy(psat)
 
     for kill in scenario.kill["bus"]:
+        print kill
         new_psat.remove_bus(kill)
     for kill in scenario.kill["line"]:
         print kill
-        # new_psat.remove_line(kill)
+        new_psat.remove_line(kill)
     for kill in scenario.kill["generator"]:
         print kill
-        # new_psat.remove_generator(kill)
+        new_psat.remove_generator(kill)
     if scenario.all_supply:
-        print kill
-        # new_psat.set_all_supply(scenario.all_supply)
+        new_psat.set_all_supply(scenario.all_supply)
     if scenario.all_demand:
-        print kill
-        # new_psat.set_all_demand(scenario.all_demand)
+        new_psat.set_all_demand(scenario.all_demand)
     if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
         raise Exception("not implemented")
 
+    # fix mismatch in powers 
+
+    
+    
     return new_psat
 
 
@@ -467,8 +470,7 @@ def example4():
 
     data = """
     [outage247] opf
-      remove bus 1
-      result fail
+remove generator G1
           """
 
     scenario = text_to_scenario(data)

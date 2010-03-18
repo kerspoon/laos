@@ -28,6 +28,9 @@ simulation_batch.py - SimulationBatch - batch_file - batch
 #------------------------------------------------------------------------------
 
 from misc import as_csv 
+import unittest
+from modifiedtestcase import ModifiedTestCase
+from StringIO import StringIO
 
 #------------------------------------------------------------------------------
 #  
@@ -151,15 +154,16 @@ class SimulationBatch(object):
             elif line[0] == "remove":
                 if line[1] == "bus":
                     bus_no = int(line[2])
-                    add_kill("bus",bus_no)
+                    add_kill("bus", bus_no)
                 elif line[1] == "line":
                     name = line[2]
                     add_kill("line", name)
                 elif line[1] == "generator":
                     name = line[2]
-                    add_kill("generator",name)
+                    add_kill("generator", name)
                 else:
-                    raise Exception("got %s expected (line, generator, bus)" % line[1])
+                    raise Exception("got %s expected (line, generator, bus)" 
+                                    % line[1])
             
             # set
             elif line[0] == "set":
@@ -178,7 +182,8 @@ class SimulationBatch(object):
                     value = float(line[3])
                     set_all_demand(value)
                 else:
-                    raise Exception("got %s expected (all?, supply, demand)" % line[1])
+                    raise Exception("got %s expected (all?, supply, demand)" 
+                                    % line[1])
            
             # results 
             elif line[0] == "result":
@@ -187,7 +192,62 @@ class SimulationBatch(object):
 
             # nothing else allowed
             else:
-                raise Exception("got %s expected (remove, set, result, [...], #)" % line[0])
+                raise Exception("got %s expected (remove, set, result, [...], #)" 
+                                % line[0])
+
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
+class Test_read(ModifiedTestCase):
+
+    def util_readwrite_match(self, inp):
+        sb = SimulationBatch()        
+        sb.read(StringIO(inp))
+        stream = StringIO()
+        sb.write(stream)
+        self.assertEqual(stream.getvalue(), inp)
+        
+    def test_1(self):
+        self.util_readwrite_match("""[name123] pf\n""")
+        self.util_readwrite_match("""[name123] opf\n""")
+        self.util_readwrite_match(
+            """[name123] pf
+  remove bus 1
+""")
+        self.util_readwrite_match(
+            """[name123] pf
+  remove bus 10
+""")
+        self.util_readwrite_match(
+            """[name123] pf
+  remove line a4
+""")
+        self.util_readwrite_match(
+            """[name123] pf
+  remove generator g10
+""")
+        self.util_readwrite_match(
+            """[name123] pf
+  remove line a9
+  remove generator g11
+""")
+        self.util_readwrite_match(
+            """[name123] pf
+  set all demand 0.86
+  result fail
+""")
+
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
+if __name__ == '__main__':
+    unittest.main()
 
 
 #------------------------------------------------------------------------------

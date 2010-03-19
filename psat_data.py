@@ -60,10 +60,17 @@ def read_section(stream, items, classtype):
         if re.match("\A *\] *; *\Z", line): # if line == "];"
             break
 
-        if len(line) == 0 or line.startswith("#"):
+        if len(line) == 0 or line.startswith("%"):
             continue
 
         cols = [x.lower() for x in line.replace(";"," ").split()]
+
+        # strip comment delimiter from component ID
+        # e.g. change '%a1' to 'a1' if it even exists
+        # (it wont for busbars for instance)
+        if cols[-1].startswith("%"):
+            cols[-1] = cols[-1][1:]
+
         items[n] = read_struct(classtype, cols)
 
 
@@ -80,8 +87,8 @@ class PsatData(object):
         types = "int int real real int int".split()
  
     class Line(struct):
-        entries = "fbus tbus s_rating v_rating f_rating length v_ratio r x b tap shift i_limit p_limit s_limit status".split()
-        types = "int int int int int real real real real real real real real real real int".split()
+        entries = "fbus tbus s_rating v_rating f_rating length v_ratio r x b tap shift i_limit p_limit s_limit status cid".split()
+        types = "int int int int int real real real real real real real real real real int str".split()
  
     class Slack(struct):
         entries = "bus_no s_rating v_rating v_magnitude ref_angle q_max q_min v_max v_min p_guess lp_coeff ref_bus status".split()
@@ -104,8 +111,8 @@ class PsatData(object):
         types = "int int real real real real real real real real real real real real real real real int".split()
 
     class Supply(struct):
-        entries = "bus_no s_rating p_direction p_bid_max p_bid_min p_bid_actual p_fixed p_proportional p_quadratic q_fixed q_proportional q_quadratic commitment cost_tie_break lp_factor q_max q_min cost_cong_up cost_cong_down status".split()
-        types = "int int real real real real real real real real real real real real real real real real real int".split()
+        entries = "bus_no s_rating p_direction p_bid_max p_bid_min p_bid_actual p_fixed p_proportional p_quadratic q_fixed q_proportional q_quadratic commitment cost_tie_break lp_factor q_max q_min cost_cong_up cost_cong_down status cid".split()
+        types = "int int real real real real real real real real real real real real real real real real real int str".split()
 
     def __init__(self):
         self.busses = {}

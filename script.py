@@ -217,6 +217,10 @@ def scenario_to_psat(scenario, psat):
     if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
         raise Exception("not implemented")
 
+    # fix mismatch in powers 
+
+    
+    
     return new_psat
 
 

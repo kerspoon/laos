@@ -123,7 +123,7 @@ class PsatData(object):
         self.shunts = {}
         self.demand = {}
         self.supply = {}
-        self.mismatch = 0.0 
+        self.mismatch = 0.0
 
     def read(self, stream):
 
@@ -274,9 +274,13 @@ class PsatData(object):
 
     def fix_mismatch(self):
         """
-        change generator powers so that the mismatch is taking
-        into account. Keep to limits. 
+        Changes the generators power to compensate for the imbalance caused 
+        by remove_* or set_*. It sets each generator proportionally based 
+        upon it's current generating power (though it respects generator 
+        limits). 
 
+        It does this by using `self.mismatch`
+        TODO: Not sure what to do with reactive power
         TODO: make this only count scheduleable generators
               i.e. not wind farms
         """
@@ -296,6 +300,7 @@ class PsatData(object):
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
+
 
 def fix_mismatch(mismatch, gen_power, gen_limit):
     """

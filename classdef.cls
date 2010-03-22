@@ -126,7 +126,7 @@ func batch_matlab_script  :: Str, SimulationBatch ->
 func simulate             :: Str -> Bool
 
 --------------------------------------------------------------------------------
- 
+
 class NetworkProbability
   """
   the Monte Carlo sampler, it creates

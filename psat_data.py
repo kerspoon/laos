@@ -27,7 +27,7 @@ psat_data.py - PsatData - psat_file - psat
 #  Imports:
 #------------------------------------------------------------------------------
 
-from misc import struct, read_struct
+from misc import struct, read_struct, as_csv
 import re
 import unittest
 from StringIO import StringIO
@@ -46,8 +46,12 @@ def write_section(stream, items, title):
 
     stream.write(title + ".con = [ ... \n")
     for key, value in sorted(items.items()):
-        stream.write("  " + str(value) + ";\n")
-    stream.write(" ];\n")
+        if "cid" == value.entries[-1]:
+            tmp = as_csv([value.__dict__[x] for x in value.entries[:-1]], " ")
+            stream.write("  " + tmp + "; %" + value.cid + "\n")
+        else:
+            stream.write("  " + str(value) + ";\n")
+    stream.write("];\n\n")
 
 
 def read_section(stream, classtype):
@@ -247,6 +251,7 @@ class PsatData(object):
 
     def set_all_demand(self, value):
         # todo: might need to set mismatch
+        # todo: test
         for load in self.loads.values():
             # Note:: should I change P, Q or both. 
             load.p *= value
@@ -661,6 +666,40 @@ PV.con = [ ...
 #------------------------------------------------------------------------------
 
 
+class Test_read_write(ModifiedTestCase):
+
+    def test_basic(self):
+        pd = PsatData()
+        istream = StringIO("""Bus.con = [ ... 
+  1 138 1.0 0.0 2 1;
+  2 138 1.0 0.0 2 1;
+  3 138 1.0 0.0 2 1;
+  4 138 1.0 0.0 2 1;
+];
+
+Line.con = [ ... 
+  1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1; %a1
+  1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1; %a2
+  1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1; %a3
+  2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1; %a5
+];
+
+PV.con = [ ... 
+  1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1;
+  2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1;
+  7 100 138 2.4 1.025 1.8 0.0 1.05 0.95 1.0 1;
+];
+
+""")
+        pd.read(istream)
+        ostream = StringIO()
+        pd.write(ostream)
+        self.assertEqual(istream.getvalue(), ostream.getvalue())
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
 if __name__ == '__main__':
     unittest.main()
-

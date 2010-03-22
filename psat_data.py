@@ -49,30 +49,35 @@ def write_section(stream, items, title):
     stream.write(" ];\n")
 
 
-def read_section(stream, items, classtype):
+def read_section(stream, classtype):
     """read one section of Matlab file, assuming the header is done.
        and assuming that each line is one row ended by a semicolon. 
+       In addition to the matlab spec a compoent can have an ID specified 
+       by adding %XX to the end of its line where XX is the id. 
     """
+
+    items = []
 
     for n,line in enumerate(stream):
         line = line.strip()
 
+        # check if we are done 
         if re.match("\A *\] *; *\Z", line): # if line == "];"
             break
 
+        # skip comments
         if len(line) == 0 or line.startswith("%"):
             continue
 
+        # everything should be lowercase, we don't care about the ';'
         cols = [x.lower() for x in line.replace(";"," ").split()]
 
         # strip comment delimiter from component ID
-        # e.g. change '%a1' to 'a1' if it even exists
-        # (it wont for busbars for instance)
+        # e.g. change '%a1' to 'a1' if it exists
         if cols[-1].startswith("%"):
             cols[-1] = cols[-1][1:]
 
         items[n] = read_struct(classtype, cols)
-
 
 #------------------------------------------------------------------------------
 #
@@ -126,59 +131,44 @@ class PsatData(object):
         self.mismatch = 0.0
 
     def read(self, stream):
-
+     
         def title_matches(line, title):
             #todo: replace with regexp
             return line.startswith(title)
-
+     
+        def read_as_cid(storage, classtype):
+            assert len(storage) == 0
+            for item in read_section(stream, classtype):
+                storage[item.cid] = item
+            assert len(storage) >= 0
+     
+        def read_as_bus_no(storage, classtype):
+            assert len(storage) == 0
+            for item in read_section(stream, classtype):
+                storage[item.bus_no] = item
+            assert len(storage) >= 0
+            
         for line in stream:
             line = line.strip()
-
-            if len(line) == 0 or line.startswith("#"):
+     
+            if len(line) == 0 or line.startswith("%"):
                 continue
             elif title_matches(line, "Bus.con"):
-                assert len(self.busses) == 0
-
-                # silly little hack to get busses[id].bus_no == id
-                tmp = {}
-                read_section(stream, tmp, self.Bus)
-                for bus in tmp.values():
-                    self.busses[bus.bus_no] = bus
-
-                # make sure that hack worked
-                assert len(self.busses) >= 1
-                for idx,bus in self.busses.items():
-                    assert bus.bus_no == idx, str(bus.bus_no) + " " + str(idx)
+                read_as_bus_no(self.busses, self.Bus)
             elif title_matches(line, "Line.con"):
-                assert len(self.lines) == 0
-                read_section(stream, self.lines, self.Line)
-                assert len(self.lines) >= 1
+                read_as_cid(self.lines, self.Line)
             elif title_matches(line, "SW.con"):
-                assert len(self.slack) == 0
-                read_section(stream, self.slack, self.Slack)
-                assert len(self.slack) == 1
+                read_as_bus_no(self.slack, self.Slack)
             elif title_matches(line, "PV.con"):
-                assert len(self.generators) == 0
-                read_section(stream, self.generators, self.Generator)
-                assert len(self.generators) >= 0
+                read_as_bus_no(self.generators, self.Generator)
             elif title_matches(line, "PQ.con"):
-                assert len(self.loads) == 0
-                read_section(stream, self.loads, self.Load)
-                assert len(self.loads) >= 1
+                read_as_bus_no(self.loads, self.Load)
             elif title_matches(line, "Shunt.con"):
-                assert len(self.shunts) == 0
-                read_section(stream, self.shunts, self.Shunt)
-                assert len(self.shunts) >= 0
-            elif title_matches(line, "Demand.con"):
-                assert len(self.demand) == 0
-                read_section(stream, self.demand, self.Demand)
-                assert len(self.demand) >= 0 
+                read_as_bus_no(self.shunts, self.Shunt)
             elif title_matches(line, "Supply.con"):
-                assert len(self.supply) == 0
-                read_section(stream, self.supply, self.Supply)
-                assert len(self.supply) >= 0
+                read_as_cid(self.supply, self.Supply)
             else:
-                raise Exception("expected matlab section, got " + line)
+                raise Exception("expected matlab section, got '" + line + "'")
             
     def write(self, stream):
         write_section(stream, self.busses, "Bus")
@@ -210,9 +200,7 @@ class PsatData(object):
 
         for idx, line in self.lines.items():
             if line.fbus == bus_no or line.tbus == bus_no:
-                self.remove_line(idx, 
-                                 line.fbus,
-                                 line.tbus)
+                self.remove_line(idx)
 
         for idx, gen in self.generators.items():
             if gen.bus_no == bus_no:
@@ -227,20 +215,16 @@ class PsatData(object):
         assert len(self.slack) == 1
         assert self.slack[0].bus_no != bus_no, "todo: deal with deleting slack bus"
 
-    def remove_line(self, line_id, fbus, tbus):
-        assert self.lines[line_id].fbus == fbus
-        assert self.lines[line_id].tbus == tbus
+    def remove_line(self, line_id):
         del self.lines[line_id]
         # TODO:: deal with islanding
 
-    def remove_generator(self, supply_id, bus_no=None):
+    def remove_generator(self, supply_id):
         """kill the specified supply and reduce the corosponding 
            PV element (self.generators) by the correct amount"""
-        
-        if bus_no:
-            assert self.supply[supply_id].bus_no == bus_no
-        else:
-            bus_no = self.supply[supply_id].bus_no
+
+        print self.supply.keys()
+        bus_no = self.supply[supply_id].bus_no
 
         gens = [n for n,x in enumerate(self.generators.values()) 
                     if x.bus_no == bus_no]
@@ -260,17 +244,6 @@ class PsatData(object):
         for load in self.loads.values():
             # Note:: should I change P, Q or both. 
             load.p *= value
-
-#     def set_all_supply(self, value):
-#         # can't set this simply it depends on the bid price.
-#         raise Exception("not implemented")
-#  
-#     def set_demand(self, bus_no, value):
-#         raise Exception("not implemented")
-#  
-#     def set_supply(self, bus_no, value):
-#         # can't set this simply it depends on the bid price.
-#         raise Exception("not implemented")
 
     def fix_mismatch(self):
         """
@@ -409,44 +382,43 @@ class Test_fix_mismatch(ModifiedTestCase):
 #
 #------------------------------------------------------------------------------
 
-
 class Test_kill_lines(ModifiedTestCase):
 
     def setUp(self):
         self.pd = PsatData()
         self.lines = [
-            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1",
-            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1",
-            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1",
-            "1 5 100 138 60 0.0 0.0 0.0218 0.0845 0.0229 0.0 0.0 2.08 0.0 2.2 1",
-            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1"]
+            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1 a1",
+            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1 a2",
+            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1 a3",
+            "1 5 100 138 60 0.0 0.0 0.0218 0.0845 0.0229 0.0 0.0 2.08 0.0 2.2 1 a4",
+            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1 a5"]
         for n,line in enumerate(self.lines):
-            self.pd.lines[n] = read_struct(PsatData.Line, line.split())
+            self.pd.lines[line[-1]] = read_struct(PsatData.Line, line.split())
  
     def util_pprint(self, collection):
         return [str(value) for key, value in sorted(collection.items())]
         
     def test_1(self):
-        self.pd.remove_line(0, 1, 2)
+        self.pd.remove_line(0)
         self.assertEqual(
             self.util_pprint(self.pd.lines),
             self.lines[1:])
 
     def test_2(self):
-        self.pd.remove_line(1, 1, 3)
+        self.pd.remove_line(1)
         self.assertEqual(
             self.util_pprint(self.pd.lines),
             [self.lines[0]] + self.lines[2:])
 
     def test_3(self):
-        self.pd.remove_line(2, 1, 3)
+        self.pd.remove_line(2)
         self.assertEqual(
             self.util_pprint(self.pd.lines),
             self.lines[:2] + self.lines[3:])
 
     def test_4(self):
-        self.pd.remove_line(2, 1, 3)
-        self.pd.remove_line(4, 2, 4)
+        self.pd.remove_line(2)
+        self.pd.remove_line(4)
         self.assertEqual(
             self.util_pprint(self.pd.lines),
             self.lines[:2] + [self.lines[3]])
@@ -461,37 +433,28 @@ class Test_kill_generator(ModifiedTestCase):
 
     def setUp(self):
         self.pd = PsatData()
-        self.supply = [
-            ("1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0 0"
-             ".0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1"),
-            ("7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0 0"
-             ".0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1"),
-            ("7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0 0"
-             ".0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1")]
+        self.supply = """
+1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 a1
+1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 a1
+1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 a2
+1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1a3
+1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1a4
+2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 a5
+2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 a6
+2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1 a7
+2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1 a8
+7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0  .0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1 a9
+7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0  .0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1 a10
+7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0  .0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1 a11
+""".split("\n")
 
         self.generators = [
             "1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1",
             "2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1",
             "7 100 138 2.4 1.025 1.8 0.0 1.05 0.95 1.0 1"]
 
-        for n,item in enumerate(self.supply):
-            self.pd.supply[n] = read_struct(PsatData.Supply, item.split())
+        for item in self.supply:
+            self.pd.supply[item[-1]] = read_struct(PsatData.Supply, item.split())
  
         for n,item in enumerate(self.generators):
             self.pd.generators[n] = read_struct(PsatData.Generator, item.split())
@@ -508,7 +471,7 @@ class Test_kill_generator(ModifiedTestCase):
             self.generators)
 
     def test_1(self):
-        self.pd.remove_generator(0, 1)
+        self.pd.remove_generator("a1")
         self.assertEqual(
             self.util_pprint(self.pd.supply),
             self.supply[1:])
@@ -517,7 +480,7 @@ class Test_kill_generator(ModifiedTestCase):
             ["1 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1"] + self.generators[1:])
 
     def test_2(self):
-        self.pd.remove_generator(3, 1)
+        self.pd.remove_generator("a4")
         self.assertEqual(
             self.util_pprint(self.pd.supply),
             self.supply[:3] + self.supply[4:])
@@ -526,8 +489,8 @@ class Test_kill_generator(ModifiedTestCase):
             ["1 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1"] + self.generators[1:])
 
     def test_3(self):
-        self.pd.remove_generator(3, 1)
-        self.pd.remove_generator(4, 2)
+        self.pd.remove_generator("a4")
+        self.pd.remove_generator("a5")
         self.assertEqual(
             self.util_pprint(self.pd.supply),
             self.supply[:3] + self.supply[5:])
@@ -588,25 +551,25 @@ class Test_kill_bus2(ModifiedTestCase):
             "3 138 1.0 0.0 2 1",
             "4 138 1.0 0.0 2 1"]
         self.lines = [
-            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1",
-            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1",
-            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1",
-            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1"]
+            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1 a1",
+            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1 a2",
+            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1 a3",
+            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1 a4"]
         self.supply = [
-            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
-            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
-            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
-            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"]
+            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 g1",
+            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 g2",
+            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1 g3",
+            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1 g4",
+            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 g5",
+            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1 g6",
+            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1 g7",
+            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1 g8"]
         self.generators = [
             "1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1",
             "2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1"]
 
         for n,item in enumerate(self.supply):
-            self.pd.supply[n] = read_struct(PsatData.Supply, item.split())
+            self.pd.supply[item[-1]] = read_struct(PsatData.Supply, item.split())
  
         for n,item in enumerate(self.generators):
             self.pd.generators[n] = read_struct(PsatData.Generator, item.split())
@@ -615,7 +578,7 @@ class Test_kill_bus2(ModifiedTestCase):
             self.pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
 
         for n,line in enumerate(self.lines):
-            self.pd.lines[n] = read_struct(PsatData.Line, line.split())
+            self.pd.lines[line[-1]] = read_struct(PsatData.Line, line.split())
 
         self.pd.slack[0] = read_struct(
             PsatData.Slack,

@@ -221,7 +221,8 @@ class PsatData(object):
 
         # really should be an 'assert' not an 'if' but make testing easier
         if len(self.slack) == 1:
-            assert self.slack[0].bus_no != bus_no, "can't delete slack bus"
+            slack = self.slack.values()[0]
+            assert slack.bus_no != bus_no, "can't delete slack bus"
 
     def remove_line(self, line_id):
         del self.lines[line_id]
@@ -271,16 +272,18 @@ class PsatData(object):
               i.e. not wind farms
         """
 
+        scheduleable_generators = self.generators.values()
+
         if self.mismatch == 0:
             return
 
         res = fix_mismatch(
             self.mismatch, 
-            [g.p for g in self.generators], 
-            [g.s_rating for g in self.generators])
+            [g.p for g in scheduleable_generators], 
+            [g.s_rating for g in scheduleable_generators])
 
-        for n in range(len(self.generators)):
-            self.generators[n].p = res[n]
+        for newp, generator in zip(res, scheduleable_generators):
+            generator.p = newp
 
 
 #------------------------------------------------------------------------------

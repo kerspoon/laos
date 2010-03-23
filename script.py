@@ -80,6 +80,7 @@ def make_failures(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.failures(str(x)))
+    assert count == len(batch)
     return batch
 
 
@@ -201,26 +202,16 @@ def scenario_to_psat(scenario, psat):
 
     new_psat = deepcopy(psat)
 
-    for kill in scenario.kill["bus"]:
-        print kill
+    for kill in scenario.kill_bus:
         new_psat.remove_bus(kill)
-    for kill in scenario.kill["line"]:
-        print kill
+    for kill in scenario.kill_line:
         new_psat.remove_line(kill)
-    for kill in scenario.kill["generator"]:
-        print kill
+    for kill in scenario.kill_gen:
         new_psat.remove_generator(kill)
-    if scenario.all_supply:
-        new_psat.set_all_supply(scenario.all_supply)
     if scenario.all_demand:
         new_psat.set_all_demand(scenario.all_demand)
-    if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
-        raise Exception("not implemented")
 
-    # fix mismatch in powers 
-
-    
-    
+    new_psat.fix_mismatch()
     return new_psat
 
 
@@ -275,7 +266,7 @@ def batch_simulate(batch, psat, size=10):
     clean_files()
 
 
-def single_simulate(psat, simtype, clean=True):
+def single_simulate(psat, simtype, title, clean=True):
     """func single_simulate      :: PsatData, Str, Bool -> PsatReport
        ----
        run matlab with the PsatData `psat` as either 
@@ -284,7 +275,6 @@ def single_simulate(psat, simtype, clean=True):
        remove temp files if specified
     """
 
-    title = "000"
     matlab_filename = "matlab_" + title
     psat_filename = "psat_" + title + ".m"
     report_filename = "psat_" + title + "_01.txt"
@@ -315,7 +305,7 @@ def simulate_scenario(psat, scenario, clean=True):
     """
 
     new_psat = scenario_to_psat(scenario, psat)
-    return single_simulate(new_psat, scenario.simtype, clean)
+    return single_simulate(new_psat, scenario.simtype, scenario.title, clean)
 
 
 def single_matlab_script(filename, psat_filename, simtype):
@@ -469,9 +459,9 @@ def example4():
     clean = True
 
     data = """
-    [outage247] opf
-remove generator G1
-          """
+           [example_4] opf
+             remove generator g1
+           """
 
     scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
@@ -484,7 +474,31 @@ example4()
 
 
 def example5():
-    pass 
+
+    clean_files()
+    clean = False
+
+    data = """
+           [base] opf
+           #[rem_bus_1] opf
+           #  remove bus 1
+           [rem_li_a1] opf
+             remove line a1
+           [rem_gen_g1] opf
+             remove generator g1
+           [set_double] opf
+             set all demand 2.0
+           [set_half] opf
+             set all demand 0.5
+           """
+
+    batch = SimulationBatch()
+    batch.read(StringIO(data))
+    psat = read_psat("rts.m")
+
+    for scenario in batch:
+        report = simulate_scenario(psat, scenario, clean)
+        print "result = '" + str(report_in_limits(report)) + "'"
 
 
 # example5()

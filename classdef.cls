@@ -1,5 +1,5 @@
 
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 private func write_section :: Stream -> Dict 'items' -> Str 'title' -> None
     """
@@ -99,7 +99,143 @@ class PsatData
   class Shunt 
   class Demand
 
---------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+  
+class Scenario
+  """
+  Scenario is a structure for holding changes to a network such as the loss
+  of a components or change in power.
+
+  It currently supports removing a line, generator, or busbar as well as 
+  setting all load (demand) by a factor. 'simtype' says how it should be
+  simulated. 
+  """
+
+  func write    :: Ostream -> None
+
+  var title      :: Str
+  var simtype    :: Literal('pf','opf')
+  var kill_bus   :: [BusNum]
+  var kill_gen   :: [Cid]
+  var kill_line  :: [Cid]
+  var all_demand :: Real
+  var result     :: Literal('pass', 'fail', 'error')
+
+class SimulationBatch
+  """
+  Manager for a set of Scenario instances, called a batch file. This class
+  probably isn't needed. 
+  """
+  func add      :: Scenario -> None
+  func read     :: Istream -> None
+  func write    :: Ostream -> None
+  func __iter__ :: None -> Iter(Scenario)
+
+------------------------------------------------------------------------------
+
+private func probability_failure :: PReal 'failrate' -> UnitReal
+  """
+  returns the probability of a component 
+  failing given the failure rate
+  """
+
+private func probability_outage :: PReal 'mttf' -> PReal 'mttr' -> UnitReal
+  """
+  returns the probability of a component 
+  being on outage given the mean time to fail
+  and restore
+  """
+
+private func fail :: UnitReal 'pfail'
+  """
+  does it fail?
+  """
+
+class NetworkProbability
+  """
+  A Data file containing the probability of failure of various components
+  as well as joint failure of different components. It creates scenarios 
+  from a network probability data file. 
+  """
+  func read     :: Istream -> None
+  func write    :: Ostream -> None
+
+  func outages  :: Str -> Scenario
+    """
+    Create a Scenario representing a possible state of the system
+    as the system operator would see it (before any operator action).
+    i.e. make a scenario.
+    Hence it covers things like components out of service for maintanence
+    and a load forcast.
+    """
+
+  func failures :: Str -> Scenario
+    """
+    Create a Scenario representing unexpected changes to a scenario. So it
+    covers things like failures and load forcast error.
+    """
+
+  private func crow_fails :: [Cid] 'linekill' -> [Cid]
+    """
+    tripping certain lines causes certain other line to trip with a given
+    probability. This does that tripping returning the list of line ID that
+    should be tripped.
+    """
+
+  class Bus
+    var bus_id      :: BusNo 
+    var fail_rate   :: PReal
+    var repair_rate :: PReal
+    var pfail       :: UnitReal
+    var pout        :: UnitReal
+
+  class Generator
+    var name        :: Cid
+    var bus_id      :: BusNo
+    var mttf        :: PReal
+    var mttr        :: PReal
+    var gen_type    :: Str
+    var pfail       :: UnitReal
+    var pout        :: UnitReal
+
+  class Line
+    var name        :: Cid
+    var fbus        :: BusNo
+    var tbus        :: BusNo
+    var fail_rate   :: PReal
+    var repair_rate :: PReal
+    var trans_fail  :: PReal
+    var pfail       :: UnitReal
+    var pout        :: UnitReal
+
+  class Crow
+    var line1       :: Cid
+    var line2       :: Cid
+    var probability :: PReal
+
+------------------------------------------------------------------------------
+
+class PsatReport
+  """
+  Read in a report from psat; check format & sanity check.
+  """
+
+  func in_limit :: None -> Bool
+  func read     :: istream(report_file) -> None
+
+  var power_flow :: Dict(BusNo, PowerFlow)
+  var acceptable :: Bool
+
+  class PowerFlow
+    var name  :: BusNo 
+    var v     :: Real
+    var phase :: Real
+    var pg    :: Real
+    var qg    :: Real
+    var pl    :: Real
+    var ql    :: Real
+
+------------------------------------------------------------------------------
 
 func clean_files          :: ->
 
@@ -125,45 +261,6 @@ func single_matlab_script :: Str, Str, Str ->
 func batch_matlab_script  :: Str, SimulationBatch -> 
 func simulate             :: Str -> Bool
 
---------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
-class NetworkProbability
-  """
-  the Monte Carlo sampler, it creates
-  scenarios from a network probability data file. 
-  """
-  func read     :: istream(netfile) -> 
-  func write    :: ostream(netfile) ->
-  func outages  :: str -> Scenario
-  func failures :: str -> Scenario
-  class Bus
-  class Generator
-  class Line
-  class Crow
 
---------------------------------------------------------------------------------
-  
-class SimulationBatch
-  """
-  manager for a set of Scenario instances, called a batch file.
-  Scenario are a structure for holding changes to a network
-  such as the loss of a components or change in power.
-  """
-  func add      :: Scenario ->
-  func read     :: istream(batch_file) -> 
-  func write    :: ostream(batch_file) ->
-  func __iter__ :: -> iter(Scenario)
-  class Scenario
-
---------------------------------------------------------------------------------
-
-class PsatReport
-  """
-  Read in a report from psat; check format & sanity check.
-  """
-  class PowerFlow
-  class LineFlow
-  func in_limit :: -> Bool
-  func read     :: istream(report_file) -> 
-
---------------------------------------------------------------------------------  

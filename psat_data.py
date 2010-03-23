@@ -221,7 +221,7 @@ class PsatData(object):
 
         # really should be an 'assert' not an 'if' but make testing easier
         if len(self.slack) == 1:
-            assert self.slack[0].bus_no != bus_no, "todo: deal with deleting slack bus"
+            assert self.slack[0].bus_no != bus_no, "can't delete slack bus"
 
     def remove_line(self, line_id):
         del self.lines[line_id]
@@ -235,7 +235,9 @@ class PsatData(object):
 
         # TODO set-up mini pool system for deciding power of each gen 
         # for now assume they distributed power equally.
-        num_units = len([x for x in self.supply.values() if x.bus_no == bus_no])
+        num_units = len([x for x in self.supply.values() 
+                         if x.bus_no == bus_no])
+
         assert num_units >= 1
 
         unit_power = self.generators[bus_no].p / num_units

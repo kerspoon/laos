@@ -30,14 +30,48 @@ network_probability.py NetworkProbability - prob_file - prob
 from misc import struct, read_struct, as_csv
 import random
 import math
+import sys
+from StringIO import StringIO
 
 from simulation_batch import Scenario
 import buslevel 
 
 #------------------------------------------------------------------------------
-#
+# eBNF
 #------------------------------------------------------------------------------
 
+# See classdef.cls for the datatypes of the line elements.
+
+#
+# S        ::= cmtline* (infoline comment? nl cmtline* )*
+# infoline ::= (busline | lineline | genline | crowline)
+# busline  ::= 'bus' bus_id fail_rate repair_rate
+# lineline ::= 'line' name fbus tbus fail_rate repair_rate trans_fail 
+# genline  ::= 'generator' name bus_id mttf mttr gen_type
+# crowline ::= 'crow' line1 line2 probability
+# comments ::= '#' [A-Za-z0-9]*
+# cmtline  ::= comments nl
+# nl       ::= newline
+#
+
+#------------------------------------------------------------------------------
+# Example
+#------------------------------------------------------------------------------
+
+# bus    101    0.025   13 
+# bus    102    0.025   13 
+# bus    103    0.025   13 
+# line   A7     103     124   .02   768       0.0
+# line   A8     104     109   .36   10        1.4
+# generator    G47    213     950   50    U197         
+# generator    G48    214     -1    -1    Sync Cond      
+# crow   C25-2  C25-1   0.075
+# crow   C30    C34     0.075
+# crow   C34    C30     0.075
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
 
 def probability_failure(failrate):
     # probability_failure :: real(>0) -> real(0,1)
@@ -78,17 +112,6 @@ class NetworkProbability(object):
        A Data file containing the probability of failure of various components
        as well as joint failure of different components.
 
-       e.g. 
-           bus , 101 , 0.025 , 13 
-           bus , 102 , 0.025 , 13 
-           bus , 103 , 0.025 , 13 
-           line , A7    , 103 , 124 , .02 ,   768 ,  0.0
-           line , A8    , 104 , 109 , .36 ,    10 ,  1.4
-           gen , G47 , 213 , 950  ,  50  ,   U197         
-           gen , G48 , 214 , -1   ,  -1  , Sync Cond      
-           crow , C25-2 , C25-1 , 0.075
-           crow , C30   , C34   , 0.075
-           crow , C34   , C30   , 0.075
     """
 
     class Bus(struct):
@@ -135,13 +158,6 @@ class NetworkProbability(object):
     class Crow(struct):
         entries = "line1 line2 probability".split()
         types = "str str real".split()
-        
-        def setup(self, lines):
-            for line in lines:
-                if line.name == self.line1:
-                    self.line_1_id = line.fbus, line.tbus
-                if line.name == self.line2:
-                    self.line_2_id = line.fbus, line.tbus
 
     def __init__(self):
         self.busses = []
@@ -169,9 +185,6 @@ class NetworkProbability(object):
             else:
                 raise Exception("expected (bus, line, generator, crow) got " + cols[0])
 
-        for crow in self.crows:
-            crow.setup(self.lines)
-
     def write(self, stream):
         stream.write("# NetworkProbability data file\n")
 
@@ -195,31 +208,31 @@ class NetworkProbability(object):
         crowfails = []
         for kill in linekill:
             for crow in self.crows:
-                if crow.line_1_id == kill:
+                if crow.line1 == kill:
                     if fail(crow.probability):
-                        print "crow fail:", crow.line_1_id, kill
-                        crowfails.append(crow.line_2_id)
+                        print "crow fail:", crow.line1, kill
+                        crowfails.append(crow.line2)
         return crowfails
 
     def outages(self, name):
         scen = Scenario("outage" + name, "opf")
-        scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pout)]
-        scen.kill["line"] = [line.name for line in 
-                             self.lines if fail(line.pout)]
-        scen.kill["generator"] = [generator.name for generator in 
-                                  self.generators if fail(generator.pout)]
-        scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
+        scen.kill_bus = [bus.bus_id for bus in self.busses if fail(bus.pout)]
+        scen.kill_line = [line.name for line in 
+                          self.lines if fail(line.pout)]
+        scen.kill_gen = [generator.name for generator in 
+                         self.generators if fail(generator.pout)]
+        scen.kill_line = scen.kill_line + self.crow_fails(scen.kill_line)
         scen.all_demand = buslevel.random_bus_forecast()
         return scen
 
     def failures(self, name):
         scen = Scenario("failure" + name, "pf")
-        scen.kill["bus"] = [bus.bus_id for bus in self.busses if fail(bus.pfail)]
-        scen.kill["line"] = [line.name for line in 
+        scen.kill_bus = [bus.bus_id for bus in self.busses if fail(bus.pfail)]
+        scen.kill_line = [line.name for line in 
                              self.lines if fail(line.pfail)]
-        scen.kill["generator"] = [generator.name for generator in 
+        scen.kill_generator = [generator.name for generator in 
                                   self.generators if fail(generator.pfail)]
-        scen.kill["line"] = scen.kill["line"] + self.crow_fails(scen.kill["line"])
+        scen.kill_line = scen.kill_line + self.crow_fails(scen.kill_line)
 
         # NOTE:: 1.0 should be the value of forcast load which will always
         #        be lower than 1, but it shouldn't make too much difference. 
@@ -230,4 +243,38 @@ class NetworkProbability(object):
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
+
+
+
+def example():
+    
+    text = """# NetworkProbability data file
+# bus bus_id fail_rate repair_rate
+bus 101 0.025 13.0
+bus 102 0.025 13.0
+bus 103 0.025 13.0
+# line name fbus tbus fail_rate repair_rate trans_fail
+line a7 103 124 0.02 768.0 0.0
+line a8 104 109 0.36 10.0 1.4
+# generator name bus_id mttf mttr gen_type
+generator g47 213 950 50 u197
+generator g48 214 -1 -1 synccond
+# crow line1 line2 probability
+crow c25-2 c25-1 0.075
+crow c30 c34 0.075
+crow c34 c30 0.075
+"""
+
+    np = NetworkProbability(); 
+    np.read(StringIO(text))
+    out = StringIO()
+    np.write(out)
+
+    assert out.getvalue() == text
+
+    for _ in range(10000):
+        scen = np.outages("test")
+        scen2 = np.failures("test")
+
+example()
 

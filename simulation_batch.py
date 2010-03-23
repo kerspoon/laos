@@ -32,7 +32,7 @@ from modifiedtestcase import ModifiedTestCase
 from StringIO import StringIO
 
 #------------------------------------------------------------------------------
-#  
+#  eBNF
 #------------------------------------------------------------------------------
 
 #
@@ -48,7 +48,23 @@ from StringIO import StringIO
 # 
 # type BusNo -> PInt
 # type Cid   -> Str
-# 
+#
+
+#------------------------------------------------------------------------------
+# Example File 
+#------------------------------------------------------------------------------
+ 
+#  
+# [abc]
+#     remove bus 1
+#     remove line A3
+#     remove line A54
+# [def]
+# [ghi]
+#     remove generator G65
+# [jkl]
+#     set all demand 1.25
+#
 
 #------------------------------------------------------------------------------
 #  
@@ -60,7 +76,9 @@ class Scenario(object):
     def __init__(self, title, simtype="pf"):
         self.title = title
         self.simtype = simtype
-        self.kill = {'bus':[], 'generator':[], 'line':[]}
+        self.kill_bus = []
+        self.kill_gen = []
+        self.kill_line = []
         self.all_demand = None
         self.result = None
 
@@ -73,11 +91,11 @@ class Scenario(object):
     def write(self, stream):
         self.invariant()
         stream.write("[" + self.title + "] " + self.simtype + "\n")
-        for kill in self.kill["bus"]:
+        for kill in self.kill_bus:
             stream.write("  remove bus " + str(kill) + "\n")
-        for kill in self.kill["line"]:
+        for kill in self.kill_line:
             stream.write("  remove line " + kill + "\n")
-        for kill in self.kill["generator"]:
+        for kill in self.kill_gen:
             stream.write("  remove generator " + kill + "\n")
         if self.all_demand:
             stream.write("  set all demand " + str(self.all_demand) + "\n")
@@ -95,17 +113,6 @@ class SimulationBatch(object):
        not really sure if this class is needed at all
        it's basically just scenario_file_read/write 
        nothing else is useful in it. 
-
-       e.g. 
-           [abc]
-               remove bus 1
-               remove line A3
-               remove line A54
-           [def]
-           [ghi]
-               remove generator G65
-           [jkl]
-               set all demand 1.25
     """
 
     def __init__(self):
@@ -133,9 +140,6 @@ class SimulationBatch(object):
             # add the kill to the current contingency
             self.scenarios[-1].kill[component].append(name)
 
-        def set_all_demand(value):
-            self.scenarios[-1].all_demand = value
-
         for line in stream:
 
             line = [x.lower() for x in line.split()]
@@ -155,14 +159,11 @@ class SimulationBatch(object):
             # remove 
             elif line[0] == "remove":
                 if line[1] == "bus":
-                    bus_no = int(line[2])
-                    add_kill("bus", bus_no)
+                    self.scenarios[-1].kill_bus.append(int(line[2]))
                 elif line[1] == "line":
-                    name = line[2]
-                    add_kill("line", name)
+                    self.scenarios[-1].kill_line.append(line[2])
                 elif line[1] == "generator":
-                    name = line[2]
-                    add_kill("generator", name)
+                    self.scenarios[-1].kill_gen.append(line[2])
                 else:
                     raise Exception("got %s expected (line, generator, bus)" 
                                     % line[1])
@@ -170,8 +171,7 @@ class SimulationBatch(object):
             # set
             elif line[0] == "set":
                 if line[1:3] == ["all","demand"]:
-                    value = float(line[3])
-                    set_all_demand(value)
+                    self.scenarios[-1].all_demand = float(line[3])
                 else:
                     raise Exception("got %s expected 'demand'" % line[1])
                 
@@ -182,7 +182,7 @@ class SimulationBatch(object):
 
             # nothing else allowed
             else:
-                raise Exception("got %s expected (remove, set, result, [...], #)" 
+                raise Exception("got %s expected (remove, set, result, [])" 
                                 % line[0])
 
         self.scenarios[-1].invariant()

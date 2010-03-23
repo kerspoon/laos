@@ -70,19 +70,6 @@ class PsatReport(object):
             self.pl = pl
             self.ql = ql
 
-    class LineFlow(object):
-        """line flow results
-        """
-
-        def __init__(self, fbus, tbus, line, pf, qf, pl, ql):
-            self.fbus = fbus
-            self.tbus = tbus
-            self.line = line
-            self.pf = pf
-            self.qf = qf
-            self.pl = pl
-            self.ql = ql
-
     def __init__(self):
         self.num_bus = None
         self.num_line = None
@@ -92,7 +79,6 @@ class PsatReport(object):
 
         self.power_rate = None
         self.power_flow = {}
-        self.line_flow = {}
 
         self.acceptable = True
 
@@ -235,9 +221,9 @@ class PsatReport(object):
         if any((tok in tokens) for tok in ["reactfail", "voltfail"]):
             self.acceptable = False
 
-    #---------------------------------------------------------------------------
-    #
-    #---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+#
+#---------------------------------------------------------------------------
 
     def GetHeaders(self):
         title = Group(Optional(Literal("OPTIMAL")) + Literal("POWER FLOW REPORT"))

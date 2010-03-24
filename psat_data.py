@@ -278,7 +278,7 @@ class PsatData(object):
             return
 
         res = fix_mismatch(
-            self.mismatch, 
+            -self.mismatch, 
             [g.p for g in scheduleable_generators], 
             [g.s_rating for g in scheduleable_generators])
 

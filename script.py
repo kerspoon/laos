@@ -327,6 +327,7 @@ def single_matlab_script(filename, psat_filename, simtype):
             matlab_stream.write("runpsat pf;\n")
         elif simtype == "opf":
             matlab_stream.write("OPF.basepg = 0;\n")
+            matlab_stream.write("OPF.basepl = 0;\n") # TODO: remove this
             matlab_stream.write("runpsat pf;\n")
             matlab_stream.write("runpsat opf;\n")
         else:
@@ -456,11 +457,10 @@ def example4():
     """one specified scenario, simulated"""
 
     clean_files()
-    clean = True
+    clean = False
 
     data = """
            [example_4] opf
-             remove bus 15
            """
 
     scenario = text_to_scenario(data)
@@ -470,7 +470,7 @@ def example4():
     print "result = '" + str(report_in_limits(report)) + "'"
 
 
-example4()
+# example4()
 
 
 def example5():
@@ -515,7 +515,7 @@ def test001():
     clean_files()
     clean = False
 
-    psat = read_psat("rts.m")
+    psat = read_psat("rts2.m")
     report = single_simulate(psat, "opf", "base", clean)
     print "base result = '" + str(report_in_limits(report)) + "'"
 
@@ -529,7 +529,7 @@ def test001():
         gen.p = 10.0
         gen.v = 10.0
     report = single_simulate(psat, "opf", "ten", clean)
-    print "unit result = '" + str(report_in_limits(report)) + "'"
+    print "ten  result = '" + str(report_in_limits(report)) + "'"
 
     for gen in psat.generators.values():
         gen.p = 0.0
@@ -538,7 +538,7 @@ def test001():
     print "zero result = '" + str(report_in_limits(report)) + "'"
 
 
-# test001()
+test001()
 
 
 def test002():
@@ -562,6 +562,7 @@ def test002():
 
 
 # test002()
+
 
 def test003():
     """
@@ -591,6 +592,26 @@ def test003():
 
 
 # test003()
+
+
+def test004():
+    """
+    run two simulations on differnt files
+    """
+
+    clean_files()
+    clean = False
+
+    # psat = read_psat("rts.m")
+    # report = single_simulate(psat, "opf", "no_bas", clean)
+    # print "first result = '" + str(report_in_limits(report)) + "'"
+
+    psat = read_psat("rts2.m")
+    report = single_simulate(psat, "opf", "fixed", clean)
+    print "second result = '" + str(report_in_limits(report)) + "'"
+
+
+# test004()
 
 
 # -----------------------------------------------------------------------------

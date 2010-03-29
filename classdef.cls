@@ -36,6 +36,21 @@ class PsatData
   In addition to the matlab spec a compoent can have an ID specified 
   by adding %XX to the end of its line where XX is the id. See below 
   for more info on how the ID (cid) is used.
+  ----
+  When we delete a bus it messes up all busbar numbers as they should be
+  sequential. Not sure if that is important.
+  ----
+  The total power of all generators is the only output given from PSAT hence we
+  cannot know the level of each unit. This make is difficult to delete one
+  unit from a bus. The easiest way to overcome this is to put each unit on
+  its own virtual bus connected by a zero impedence line. We do have to deal
+  with the islanding that will be caused when we remove any bus that has a
+  generator. We could do this by:
+
+   a. Python graph theory code. Find islands, remove small islands. 
+   b. Identify special busbars, on delete delete the virtual bus of their
+      generator. 
+
   """
  
   type BusNo -> PInt

@@ -189,6 +189,11 @@ class PsatReport(object):
         
         self.ensure(False, "PowerFlow Limit")
 
+    def process_lineflow_overload(self, _):
+        # print("Limit : %s" % tokens)
+        
+        self.ensure(False, "LineFlow Limit")
+
     def process_lineflow_bus(self, tokens):
         # print("Bus Line Flow : %s" % tokens)
         # print tokens["bus1"]
@@ -210,15 +215,18 @@ class PsatReport(object):
         ten_neg_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
 
         for x in range(4):
-            self.ensure(inrange(x), "error : \n%s" % tokens)
+            self.ensure(inrange(x), "summary error : \n%s" % tokens)
 
-        self.ensure(ten_check(tokens[4]), "error : \n%s" % tokens)
-        self.ensure(ten_neg_check(tokens[5]), "error : \n%s" % tokens)
+        self.ensure(ten_check(tokens[4]), "summary error : \n%s" % tokens)
+        self.ensure(ten_neg_check(tokens[5]), "summary error : \n%s" % tokens)
 
     def process_limits(self, tokens):
         # print("Limits : %s" % tokens)
 
-        if any((tok in tokens) for tok in ["reactfail", "voltfail"]):
+        if any((tok in tokens) for tok in ["reactfail", 
+                                           "voltfail",
+                                           "currentfail",
+                                           "reactfail"]):
             self.acceptable = False
 
 #---------------------------------------------------------------------------
@@ -289,7 +297,16 @@ class PsatReport(object):
         busdef = busdef.setParseAction(self.process_lineflow_bus)
         buses = OneOrMore(busdef)
 
-        lineflow = title + head1 + head2 + buses
+        maxmin = slit("Maximum") | slit("Minimum")
+        afix = maxmin + (slit("apparent power") | slit("current")) 
+        postfix = restOfLine.suppress()
+
+        binding = afix + slit("on line") + postfix
+        overload = afix + slit("limit violation on line") + postfix
+        overload.setParseAction(self.process_lineflow_overload)
+
+        limits = ZeroOrMore(binding | overload)
+        lineflow = title + head1 + head2 + buses + limits
 
         return lineflow + lineflow
 
@@ -323,10 +340,24 @@ class PsatReport(object):
                      integer("reactfail"))
 
         react = reactfail | reactpass
+        
+        currentfail = (slit("# OF CURRENT FLOW LIMIT VIOLATIONS:") +
+                       integer("currentfail"))
 
-        current = slit("ALL CURRENT FLOWS WITHIN LIMITS") + restOfLine.suppress()
+        currentpass = (slit("ALL CURRENT FLOWS WITHIN LIMITS") +
+                       restOfLine.suppress())
+
+        current = currentpass | currentfail
+
         real = slit("ALL REAL POWER FLOWS WITHIN LIMITS") + restOfLine.suppress()
-        apparent = slit("ALL APPARENT POWER FLOWS WITHIN LIMITS") + restOfLine.suppress()
+
+        apparentfail = (slit("# OF APPARENT POWER FLOW LIMIT VIOLATIONS:") +
+                        integer("apparentfail"))
+
+        apparentpass = (slit("ALL APPARENT POWER FLOWS WITHIN LIMITS") +
+                        restOfLine.suppress())
+
+        apparent = apparentpass | apparentfail
 
         limits = title + volt + react + current + real + apparent
         limits.setParseAction(self.process_limits)

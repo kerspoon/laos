@@ -174,6 +174,8 @@ class PsatData(object):
                 read_as_bus_no(self.shunts, self.Shunt)
             elif title_matches(line, "Supply.con"):
                 read_as_cid(self.supply, self.Supply)
+            elif title_matches(line, "Demand.con"):
+                read_as_bus_no(self.demand, self.Demand)
             else:
                 raise Exception("expected matlab section, got '" + line + "'")
             
@@ -278,7 +280,7 @@ class PsatData(object):
             return
 
         res = fix_mismatch(
-            self.mismatch, 
+            -self.mismatch, 
             [g.p for g in scheduleable_generators], 
             [g.s_rating for g in scheduleable_generators])
 

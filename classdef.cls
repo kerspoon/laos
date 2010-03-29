@@ -107,9 +107,35 @@ class PsatData
     var status   :: Int  
     var cid      :: Str  
 
-  class Supply
   class Slack
+    var bus_no      :: Int
+    var s_rating    :: Int
+    var v_rating    :: Int
+    var v_magnitude :: Real 
+    var ref_angle   :: Real 
+    var q_max       :: Real 
+    var q_min       :: Real 
+    var v_max       :: Real 
+    var v_min       :: Real 
+    var p_guess     :: Real 
+    var lp_coeff    :: Real 
+    var ref_bus     :: Real 
+    var status      :: Int
+
   class Generator
+    var bus_no   :: Int
+    var s_rating :: Int
+    var v_rating :: Int
+    var p        :: Real 
+    var v        :: Real 
+    var q_max    :: Real 
+    var q_min    :: Real 
+    var v_max    :: Real 
+    var v_min    :: Real 
+    var lp_coeff :: Real 
+    var status   :: Int
+
+  class Supply
   class Load 
   class Shunt 
   class Demand

@@ -327,6 +327,7 @@ def single_matlab_script(filename, psat_filename, simtype):
             matlab_stream.write("runpsat pf;\n")
         elif simtype == "opf":
             matlab_stream.write("OPF.basepg = 0;\n")
+            matlab_stream.write("OPF.basepl = 0;\n") # TODO: remove this
             matlab_stream.write("runpsat pf;\n")
             matlab_stream.write("runpsat opf;\n")
         else:
@@ -456,11 +457,10 @@ def example4():
     """one specified scenario, simulated"""
 
     clean_files()
-    clean = True
+    clean = False
 
     data = """
            [example_4] opf
-             remove generator g1
            """
 
     scenario = text_to_scenario(data)
@@ -470,7 +470,7 @@ def example4():
     print "result = '" + str(report_in_limits(report)) + "'"
 
 
-example4()
+# example4()
 
 
 def example5():
@@ -506,24 +506,59 @@ def example5():
 
 # -----------------------------------------------------------------------------
 
+def test001():
+    """
+    a system after OPF should not depend on the values of generator.p or
+    generator.v. These should be set by the OPF routine based upon price.
+    """
+
+    clean_files()
+    clean = False
+
+    psat = read_psat("rts2.m")
+    report = single_simulate(psat, "opf", "base", clean)
+    print "base result = '" + str(report_in_limits(report)) + "'"
+
+    for gen in psat.generators.values():
+        gen.p = 1.0
+        gen.v = 1.0
+    report = single_simulate(psat, "opf", "unit", clean)
+    print "unit result = '" + str(report_in_limits(report)) + "'"
+
+    for gen in psat.generators.values():
+        gen.p = 10.0
+        gen.v = 10.0
+    report = single_simulate(psat, "opf", "ten", clean)
+    print "ten  result = '" + str(report_in_limits(report)) + "'"
+
+    for gen in psat.generators.values():
+        gen.p = 0.0
+        gen.v = 0.0
+    report = single_simulate(psat, "opf", "zero", clean)
+    print "zero result = '" + str(report_in_limits(report)) + "'"
+
+
+test001()
+
 
 def test002():
-    """take the normal system, sim it and save report. 
-       do the same with a system where all PV busses have their 
-       P & V values set to 0. it shouldn't matter with an 'opf'.
     """
+    make sure that limits are hit when we set them really low
+    """
+
     clean_files()
+    clean = False
 
-    simtype = "opf"
+    psat = read_psat("rts.m")
+    report = single_simulate(psat, "pf", "base", clean)
+    print "base result = '" + str(report_in_limits(report)) + "'"
 
-    def helper(title):
-        matlab_filename = "matlab_" + title
-        psat_filename = title + ".m"
-        single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
-        simulate(matlab_filename)
-
-    helper("rts")
-    # helper("rts2")
+    for line in psat.lines.values():
+        line.i_limit = 0.01
+        #line.p_limit = 0.01
+        line.s_limit = 0.01
+    report = single_simulate(psat, "opf", "small", clean)
+    print "small result = '" + str(report_in_limits(report)) + "'"
 
 
 # test002()
@@ -557,6 +592,26 @@ def test003():
 
 
 # test003()
+
+
+def test004():
+    """
+    run two simulations on differnt files
+    """
+
+    clean_files()
+    clean = False
+
+    # psat = read_psat("rts.m")
+    # report = single_simulate(psat, "opf", "no_bas", clean)
+    # print "first result = '" + str(report_in_limits(report)) + "'"
+
+    psat = read_psat("rts2.m")
+    report = single_simulate(psat, "opf", "fixed", clean)
+    print "second result = '" + str(report_in_limits(report)) + "'"
+
+
+# test004()
 
 
 # -----------------------------------------------------------------------------

@@ -175,6 +175,8 @@ def report_to_psat(report, psat):
         load.p = pf[load.bus_no].pl
         load.q = pf[load.bus_no].ql
 
+    assert(new_psat.in_limits())
+
     return new_psat
 
 
@@ -283,6 +285,7 @@ def single_simulate(psat, simtype, title, clean=True):
     single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
 
     # write the PsatData to file
+    assert(psat.in_limits())
     with open(psat_filename, "w") as psat_file:
         psat.write(psat_file)
 
@@ -538,7 +541,7 @@ def test001():
     print "zero result = '" + str(report_in_limits(report)) + "'"
 
 
-test001()
+# test001()
 
 
 def test002():
@@ -602,16 +605,16 @@ def test004():
     clean_files()
     clean = False
 
-    # psat = read_psat("rts.m")
-    # report = single_simulate(psat, "opf", "no_bas", clean)
-    # print "first result = '" + str(report_in_limits(report)) + "'"
+    psat = read_psat("rts.m")
+    report = single_simulate(psat, "opf", "seper", clean)
+    print "first result = '" + str(report_in_limits(report)) + "'"
 
     psat = read_psat("rts2.m")
-    report = single_simulate(psat, "opf", "fixed", clean)
+    report = single_simulate(psat, "opf", "aggre", clean)
     print "second result = '" + str(report_in_limits(report)) + "'"
 
 
-# test004()
+test004()
 
 
 # -----------------------------------------------------------------------------

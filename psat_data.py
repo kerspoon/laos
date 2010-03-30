@@ -266,7 +266,8 @@ class PsatData(object):
         Changes the generators power to compensate for the imbalance caused 
         by remove_* or set_*. It sets each generator proportionally based 
         upon it's current generating power (though it respects generator 
-        limits). 
+        limits). We then need to check limits, though if the algorithm is
+        working we shouldn't need to.
 
         It does this by using `self.mismatch`
         TODO: Not sure what to do with reactive power
@@ -274,19 +275,58 @@ class PsatData(object):
               i.e. not wind farms
         """
 
-        scheduleable_generators = self.generators.values()
-
         if self.mismatch == 0:
             return
 
-        res = fix_mismatch(
-            -self.mismatch, 
-            [g.p for g in scheduleable_generators], 
-            [g.s_rating for g in scheduleable_generators])
+        scheduleable_generators = self.generators.values()
+
+        powers = [gen.p for gen in scheduleable_generators]
+
+        limits = []
+        for gen in scheduleable_generators:
+            limits.append(supply.p_bid_max for supply in 
+                         self.supply.values() 
+                         if supply.bus_no == gen.bus_no)
+
+        res = fix_mismatch(-self.mismatch, powers, limits)
 
         for newp, generator in zip(res, scheduleable_generators):
             generator.p = newp
 
+        assert(self.in_limits())
+    
+    def in_limits(self):
+        """
+        Checks that generator power is between the sum of all supply min and
+        max bid. Checks that slack and generator voltage is within 
+        limit. 
+        requires all min bid to be <= 0 and all max bid to be >= 0.
+        """
+
+        inlimit = True
+        for generator in self.generators.values():
+            bus_no = generator.bus_no
+            supplies = [s for s in self.supply.values() if s.bus_no == bus_no]
+            max_bid = sum(s.p_bid_max for s in supplies)
+            min_bid = sum(s.p_bid_min for s in supplies)
+
+            if not (min_bid <= generator.p <= max_bid):
+                print "generator", bus_no , "power limit:", 
+                print min_bid, "<=", generator.p, "<=", max_bid
+                inlimit = False
+
+            if not(generator.v_min <= generator.v <= generator.v_max):
+                print "generator", bus_no, "volt limit:",
+                print generator.v_min, "<=", generator.v, "<=", generator.v_max
+                inlimit = False
+
+        for slack in self.slack.values():
+            if not(slack.v_min <= slack.v_magnitude <= slack.v_max):
+                print "slack", slack.bus_no, "volt limit:",
+                print slack.v_min, "<=", slack.v_magnitude, "<=", slack.v_max
+                inlimit = False
+
+        return inlimit
 
 #------------------------------------------------------------------------------
 #

@@ -79,6 +79,7 @@ class PsatData
   func remove_generator :: Cid   -> None
   func set_all_demand   :: PReal -> None
   func fix_mismatch     :: None  -> None
+  func in_limits        :: None  -> Bool
 
   class Bus
     var bus_no            :: Int 
@@ -136,7 +137,39 @@ class PsatData
     var status   :: Int
 
   class Supply
+    var bus_no         :: Int 
+    var s_rating       :: Int 
+    var p_direction    :: Real 
+    var p_bid_max      :: Real 
+    var p_bid_min      :: Real 
+    var p_bid_actual   :: Real 
+    var p_fixed        :: Real 
+    var p_proportional :: Real 
+    var p_quadratic    :: Real 
+    var q_fixed        :: Real 
+    var q_proportional :: Real 
+    var q_quadratic    :: Real 
+    var commitment     :: Real 
+    var cost_tie_break :: Real 
+    var lp_factor      :: Real 
+    var q_max          :: Real 
+    var q_min          :: Real 
+    var cost_cong_up   :: Real 
+    var cost_cong_down :: Real 
+    var status         :: Int 
+    var cid            :: Str
+
   class Load 
+    var bus_no   :: Int
+    var s_rating :: Int
+    var v_rating :: Int 
+    var p        :: Real 
+    var q        :: Real 
+    var v_max    :: Real 
+    var v_min    :: Real 
+    var z_conv   :: Real 
+    var status   :: Int 
+
   class Shunt 
   class Demand
 

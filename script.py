@@ -146,8 +146,8 @@ def report_to_psat(report, psat):
        angle, and power values from `report`.
     """
 
-
-    print "WARNING: ADD THESE LINES BACK IN"
+    # TODO: if we can work out why PSAT has discrepencies in the 
+    #       number of items in input and output then add these line back
 
     # assert len(psat.lines) == report.num_line
     # assert len(psat.slack) == 1
@@ -160,12 +160,12 @@ def report_to_psat(report, psat):
     new_psat = deepcopy(psat)
     pf = report.power_flow
 
-    slack = new_psat.slack[0]
+    slack = new_psat.slack.values()[0]
     slack.v_magnitude = pf[slack.bus_no].v
     slack.ref_angle = pf[slack.bus_no].phase
     # slack.p_guess = pf[slack.bus_no].pg
 
-    for gen in new_psat.generators:
+    for gen in new_psat.generators.values():
         assert pf[gen.bus_no] != None
         gen.p = pf[gen.bus_no].pg
         gen.v = pf[gen.bus_no].v
@@ -224,7 +224,8 @@ def batch_simulate(batch, psat, size=10):
        of size `size`. Modify `batch` in place. delete all temp files
        if it succedes 
 
-       Note:: what should we do on parsing error for report 
+       Note:: We need to say the scenario is a failure if it 
+              fails scenario_to_psat.
     """
 
     for n, group in enumerate(split_every(size, batch)):
@@ -330,7 +331,7 @@ def single_matlab_script(filename, psat_filename, simtype):
             matlab_stream.write("runpsat pf;\n")
         elif simtype == "opf":
             matlab_stream.write("OPF.basepg = 0;\n")
-            matlab_stream.write("OPF.basepl = 0;\n") # TODO: remove this
+            matlab_stream.write("OPF.basepl = 0;\n")
             matlab_stream.write("runpsat pf;\n")
             matlab_stream.write("runpsat opf;\n")
         else:
@@ -463,7 +464,7 @@ def example4():
     clean = False
 
     data = """
-           [example_4] opf
+           [example_4] pf
            """
 
     scenario = text_to_scenario(data)
@@ -483,8 +484,8 @@ def example5():
 
     data = """
            [base] opf
-           #[rem_bus_1] opf
-           #  remove bus 1
+           [rem_bus_1] opf
+             remove bus 1
            [rem_li_a1] opf
              remove line a1
            [rem_gen_g1] opf
@@ -513,6 +514,8 @@ def test001():
     """
     a system after OPF should not depend on the values of generator.p or
     generator.v. These should be set by the OPF routine based upon price.
+
+    You have to temperarily delete asser(in_limits) for this to work.
     """
 
     clean_files()
@@ -574,7 +577,7 @@ def test003():
 
     clean_files()
 
-    simtype = "pf"
+    simtype = "opf"
 
     def helper(title):
         matlab_filename = "matlab_" + title
@@ -594,7 +597,7 @@ def test003():
     helper("rts003")
 
 
-# test003()
+test003()
 
 
 def test004():
@@ -614,7 +617,7 @@ def test004():
     print "second result = '" + str(report_in_limits(report)) + "'"
 
 
-test004()
+# test004()
 
 
 # -----------------------------------------------------------------------------

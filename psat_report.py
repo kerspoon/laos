@@ -195,17 +195,22 @@ class PsatReport(object):
         self.ensure(False, "LineFlow Limit")
 
     def process_lineflow_bus(self, tokens):
+        # Lineflow data isn't actually stored; I don't need it.
+
         # print("Bus Line Flow : %s" % tokens)
         # print tokens["bus1"]
         # print tokens["bus2"]
 
-        pu_check = lambda x: dec_check(x, Decimal("-5.0"), Decimal("5.0"))
-        for x in "pf qf pl ql".split():
-            self.ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
-        self.ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["pf"], Decimal("-10.0"), Decimal("10.0")), 
+                    "lineflow pf error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["qf"], Decimal("-10.0"), Decimal("10.0")), 
+                    "lineflow qf error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["pl"], Decimal("0.0"), Decimal("3.0")), 
+                    "lineflow pl error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["ql"], Decimal("-3.0"), Decimal("3.0")), 
+                    "lineflow ql error : \n%s" % tokens)
 
-        # TODO: I don't actually add anything to self.line_flow
-        # fbus, tbus, line, pf, qf, pl, ql
+        self.ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
 
     def process_summary(self, tokens):
         # print("Summary : %s" % tokens)

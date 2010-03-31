@@ -60,16 +60,16 @@ component probabilities.
 batch_file (*.bch)
 ----
 
-    [failure32] pf
-      remove generator 13
-      set all supply 0.86
-    [outage0] opf
-      remove generator 23
-      set all demand 1.0
-    [outage1] opf
-      remove bus 1
-      remove line 13 3
-      remove generator 22
+    [abc]
+        remove bus 1
+        remove line A3
+        remove line A54
+    [def]
+    [ghi]
+        remove generator G65
+        remove line C21-4
+    [jkl]
+        set all demand 1.25
 
 matlab_file (*.m)
 ----

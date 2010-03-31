@@ -140,7 +140,6 @@ class PsatData(object):
     def read(self, stream):
      
         def title_matches(line, title):
-            #todo: replace with regexp
             return line.startswith(title)
      
         def read_as_cid(storage, classtype):
@@ -178,6 +177,16 @@ class PsatData(object):
                 read_as_bus_no(self.demand, self.Demand)
             else:
                 raise Exception("expected matlab section, got '" + line + "'")
+        self.invariant()
+
+    def invariant(self):
+        passed = self.in_limits()
+
+        if duplicates_exist(gen.bus_no for gen in self.generators):
+            print "PsatData invariant: only one bus per generator"
+            passed = False
+
+        # we could also make sure that the key and cid/bus_no match.
             
     def write(self, stream):
         write_section(stream, self.busses, "Bus")
@@ -194,6 +203,23 @@ class PsatData(object):
         assert self.busses[bus_no].bus_no == bus_no
         del self.busses[bus_no]
 
+        # as we now have virtal busses that connect to generators
+        # we need to find and delete any of those hat connect to
+        # this bus. 
+        # We can find them by using the cid of the lines
+        # find all lines with who's cid starts with "C" that 
+        # connect to this bus
+
+        for line in self.lines.values():
+            if line.fbus == bus_no:
+                self.remove_line(line.cid)
+                if line.cid.startswith("c"):
+                    self.remove_bus(line.tbus)
+            elif line.tbus == bus_no:
+                self.remove_line(line.cid)
+                if line.cid.startswith("c"):
+                    self.remove_bus(line.fbus)
+
         # kill all connecting items
         for idx, shunt in self.shunts.items():
             if shunt.bus_no == bus_no:
@@ -206,10 +232,6 @@ class PsatData(object):
         for idx, item in self.supply.items():
             if item.bus_no == bus_no:
                 del self.supply[idx]
-
-        for idx, line in self.lines.items():
-            if line.fbus == bus_no or line.tbus == bus_no:
-                self.remove_line(idx)
 
         for idx, gen in self.generators.items():
             if gen.bus_no == bus_no:
@@ -255,7 +277,7 @@ class PsatData(object):
         self.mismatch -= unit_power
 
     def set_all_demand(self, value):
-        # todo: might need to set mismatch
+        # todo: need to set mismatch!!!
         # todo: test
         for load in self.loads.values():
             # Note:: should I change P, Q or both. 
@@ -276,6 +298,7 @@ class PsatData(object):
         """
 
         if self.mismatch == 0:
+            assert(self.in_limits())
             return
 
         scheduleable_generators = self.generators.values()
@@ -284,9 +307,14 @@ class PsatData(object):
 
         limits = []
         for gen in scheduleable_generators:
-            limits.append(supply.p_bid_max for supply in 
-                         self.supply.values() 
-                         if supply.bus_no == gen.bus_no)
+            limits.append(sum(supply.p_bid_max for supply in 
+                              self.supply.values() 
+                              if supply.bus_no == gen.bus_no))
+
+        # print "-----"
+        # for x,y in zip(powers, limits):
+        #     print x,y
+        # print "-----"
 
         res = fix_mismatch(-self.mismatch, powers, limits)
 

@@ -27,7 +27,7 @@ psat_data.py - PsatData - psat_file - psat
 #  Imports:
 #------------------------------------------------------------------------------
 
-from misc import struct, read_struct, as_csv
+from misc import struct, read_struct, as_csv, duplicates_exist
 import re
 import unittest
 from StringIO import StringIO
@@ -182,7 +182,7 @@ class PsatData(object):
     def invariant(self):
         passed = self.in_limits()
 
-        if duplicates_exist(gen.bus_no for gen in self.generators):
+        if duplicates_exist(gen.bus_no for gen in self.generators.values()):
             print "PsatData invariant: only one bus per generator"
             passed = False
 
@@ -277,11 +277,13 @@ class PsatData(object):
         self.mismatch -= unit_power
 
     def set_all_demand(self, value):
-        # todo: need to set mismatch!!!
-        # todo: test
+        # Note:: should I change P, Q or both.
         for load in self.loads.values():
-            # Note:: should I change P, Q or both. 
-            load.p *= value
+            newval  = load.p * value
+            self.mismatch += load.p - newval
+            load.p = newval
+            self.demand[load.bus_no].p_bid_max = newval
+            self.demand[load.bus_no].p_bid_min = newval
 
     def fix_mismatch(self):
         """
@@ -770,6 +772,62 @@ PV.con = [ ...
         ostream = StringIO()
         pd.write(ostream)
         self.assertEqual(istream.getvalue(), ostream.getvalue())
+
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
+class Test_set_all_demand(ModifiedTestCase):
+
+    def setUp(self):
+        self.pd = PsatData()
+        istream = StringIO("""PQ.con = [ ... 
+  1   100  138  1.00  0.10  1.05  0.95  1  1;
+  2   100  138  1.00  0.10  1.05  0.95  1  1;
+  3   100  138  1.00  0.10  1.05  0.95  1  1;
+  4   100  138  1.00  0.10  1.05  0.95  1  1;
+  5   100  138  1.00  0.10  1.05  0.95  1  1;
+  6   100  138  1.00  0.10  1.05  0.95  1  1;
+ ];
+
+Demand.con = [ ... 
+   1  100  1.00  0.242  1.00 1.00  0  0  18  0  0  0  0  0  0  0  0  1;   
+   2  100  1.00  0.22   1.00 1.00  0  0  25  0  0  0  0  0  0  0  0  1;   
+   3  100  1.00  0.407  1.00 1.00  0  0  19  0  0  0  0  0  0  0  0  1;   
+   4  100  1.00  0.165  1.00 1.00  0  0  24  0  0  0  0  0  0  0  0  1;   
+   5  100  1.00  0.154  1.00 1.00  0  0  22  0  0  0  0  0  0  0  0  1;   
+   6  100  1.00  0.308  1.00 1.00  0  0  19  0  0  0  0  0  0  0  0  1;   
+ ];
+""")
+        self.pd.read(istream)
+        self.assertEqual(self.pd.mismatch, 0)
+
+    def test_one(self):
+        self.pd.set_all_demand(1)
+        self.assertAlmostEqual(self.pd.mismatch, 0)
+
+    def test_two(self):
+        self.pd.set_all_demand(2)
+        self.assertAlmostEqual(self.pd.mismatch, -6)
+        
+    def test_four(self):
+        self.pd.set_all_demand(4)
+        self.assertAlmostEqual(self.pd.mismatch, -18)
+        
+    def test_half(self):
+        self.pd.set_all_demand(0.5)
+        self.assertAlmostEqual(self.pd.mismatch, 3)
+
+    def test_0_9(self):
+        self.pd.set_all_demand(0.9)
+        self.assertAlmostEqual(self.pd.mismatch, 0.6)
+
+    def test_0_1(self):
+        self.pd.set_all_demand(0.1)
+        self.assertAlmostEqual(self.pd.mismatch, 5.4)
+
 
 #------------------------------------------------------------------------------
 #

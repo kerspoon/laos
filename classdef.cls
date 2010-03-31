@@ -171,7 +171,34 @@ class PsatData
     var status   :: Int 
 
   class Shunt 
+    var bus_no   :: Int 
+    var s_rating :: Int 
+    var v_rating :: Int 
+    var f_rating :: Int 
+    var g        :: Real
+    var b        :: Real 
+    var status   :: Int 
+
   class Demand
+    var bus_no         :: Int
+    var s_rating       :: Int
+    var p_direction    :: Real
+    var q_direction    :: Real
+    var p_bid_max      :: Real
+    var p_bid_min      :: Real
+    var p_optimal_bid  :: Real
+    var p_fixed        :: Real
+    var p_proportional :: Real
+    var p_quadratic    :: Real
+    var q_fixed        :: Real
+    var q_proportional :: Real
+    var q_quadratic    :: Real
+    var commitment     :: Real
+    var cost_tie_break :: Real
+    var cost_cong_up   :: Real
+    var cost_cong_down :: Real
+    var status         :: Int
+
 
 ------------------------------------------------------------------------------
   

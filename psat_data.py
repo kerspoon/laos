@@ -177,6 +177,7 @@ class PsatData(object):
                 read_as_bus_no(self.demand, self.Demand)
             else:
                 raise Exception("expected matlab section, got '" + line + "'")
+
         self.invariant()
 
     def invariant(self):
@@ -253,28 +254,17 @@ class PsatData(object):
         # TODO:: deal with islanding
 
     def remove_generator(self, supply_id):
-        """kill the specified supply and reduce the corosponding 
-           PV element (self.generators) by the correct amount"""
-
+        """kill the specified supply and corresponding generator
+           with the requiement that there is only one generator
+           per busbar.
+           Could kill the line and busbar as well in most cases.
+           But where there was only one gen on a bus anyway it 
+           doesn't have a virtual bus hence might have a load.
+        """
         bus_no = self.supply[supply_id].bus_no
-
-        # TODO set-up mini pool system for deciding power of each gen 
-        # for now assume they distributed power equally.
-        num_units = len([x for x in self.supply.values() 
-                         if x.bus_no == bus_no])
-
-        assert num_units >= 1
-
-        unit_power = self.generators[bus_no].p / num_units
-
-        # if we remove the last gen on the bus, remember to delete it 
-        if num_units == 1:
-            del self.generators[bus_no]
-        else:
-            self.generators[bus_no].p -= unit_power
-
+        self.mismatch -= self.generators[bus_no].p 
+        del self.generators[bus_no]
         del self.supply[supply_id]
-        self.mismatch -= unit_power
 
     def set_all_demand(self, value):
         # Note:: should I change P, Q or both.
@@ -337,6 +327,7 @@ class PsatData(object):
         for generator in self.generators.values():
             bus_no = generator.bus_no
             supplies = [s for s in self.supply.values() if s.bus_no == bus_no]
+            # assert len(supplies) > 1 # often true but not needed.
             max_bid = sum(s.p_bid_max for s in supplies)
             min_bid = sum(s.p_bid_min for s in supplies)
 
@@ -574,83 +565,75 @@ class Test_kill_generator(ModifiedTestCase):
     def setUp(self):
         self.pd = PsatData()
         self.stream = StringIO("""Supply.con = [ ... 
- 1 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g1 
- 1 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g2 
- 1 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g3 
- 1 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g4 
- 1 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g5 
- 2 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g6 
- 2 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g7 
- 2 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g8 
- 7 100 0.8 1 0.25 0 -0.65 17.9744 0.027484 0 0 0 0 0 1 0.6 0 0 0 1; %g9 
+ 25 100 0.81 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g1
+ 26 100 0.72 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g2
+ 27 100 0.63 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g3
+ 28 100 0.54 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g4
+ 29 100 0.45 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g5
+ 30 100 0.36 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g6
+ 31 100 0.27 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g7
+ 32 100 0.18 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g8
 ];
 
 PV.con = [ ... 
- 1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1
- 2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1
- 7 100 138 2.4 1.025 1.8 0.0 1.05 0.95 1.0 1
+ % ------------------- Bus 1
+ 25  100  138  0.81  1.035 0.10  0    1.05  0.95  1  1;
+ 26  100  138  0.72  1.035 0.10  0    1.05  0.95  1  1;
+ 27  100  138  0.63  1.035 0.30 -0.25 1.05  0.95  1  1;
+ 28  100  138  0.54  1.035 0.30 -0.25 1.05  0.95  1  1;
+ % ------------------- Bus 2
+ 29  100  138  0.45  1.035 0.10  0    1.05  0.95  1  1;
+ 30  100  138  0.36  1.035 0.10  0    1.05  0.95  1  1;
+ 31  100  138  0.27  1.035 0.30 -0.25 1.05  0.95  1  1;
+ 32  100  138  0.18  1.035 0.30 -0.25 1.05  0.95  1  1;
 ];""")
         self.pd.read(self.stream)
 
     def test_remove_none(self):
         self.assertEqual(
-            set([1, 2, 7]),
-            set(self.pd.generators))
-        self.assertEqual(
-            set("g1 g2 g3 g4 g5 g6 g7 g8 g9".split()),
-            set(self.pd.supply))
-        self.assertAlmostEqualList(
-            [1.72, 1.72, 2.4],
-            [item.p for item in self.pd.generators.values()])
-
-    def test_remove_first(self):
-        self.pd.remove_generator("g1")
-        self.assertEqual(
-            set([1, 2, 7]),
-            set(self.pd.generators))
-        self.assertEqual(
-            set("g2 g3 g4 g5 g6 g7 g8 g9".split()),
-            set(self.pd.supply))
-        self.assertAlmostEqualList(
-            [1.376, 1.72, 2.4],
-            [item.p for item in self.pd.generators.values()])
-
-    def test_remove_last(self):
-        self.pd.remove_generator("g9")
-        self.assertEqual(
-            set([1, 2]),
+            set([25, 26, 27, 28, 29, 30, 31, 32]),
             set(self.pd.generators))
         self.assertEqual(
             set("g1 g2 g3 g4 g5 g6 g7 g8".split()),
             set(self.pd.supply))
-        self.assertAlmostEqualList(
-            [1.72, 1.72],
-            [item.p for item in self.pd.generators.values()])
 
-    def test_remove_middle(self):
-        self.pd.remove_generator("g7")
+
+    def test_remove_first(self):
+        self.pd.remove_generator("g1")
         self.assertEqual(
-            set([1, 2, 7]),
+            set([26, 27, 28, 29, 30, 31, 32]),
             set(self.pd.generators))
         self.assertEqual(
-            set("g1 g2 g3 g4 g5 g6 g8 g9".split()),
+            set("g2 g3 g4 g5 g6 g7 g8".split()),
             set(self.pd.supply))
-        self.assertAlmostEqualList(
-            [1.72, 1.1466666667, 2.4],
-            [item.p for item in self.pd.generators.values()])
+
+    def test_remove_last(self):
+        self.pd.remove_generator("g8")
+        self.assertEqual(
+            set([25, 26, 27, 28, 29, 30, 31]),
+            set(self.pd.generators))
+        self.assertEqual(
+            set("g1 g2 g3 g4 g5 g6 g7".split()),
+            set(self.pd.supply))
+
+    def test_remove_middle(self):
+        self.pd.remove_generator("g5")
+        self.assertEqual(
+            set([25, 26, 27, 28, 30, 31, 32]),
+            set(self.pd.generators))
+        self.assertEqual(
+            set("g1 g2 g3 g4 g6 g7 g8".split()),
+            set(self.pd.supply))
 
     def test_remove_double(self):
         self.pd.remove_generator("g2")
         self.pd.remove_generator("g3")
         self.assertEqual(
-            set([1, 2, 7]),
+            set([25, 28, 29, 30, 31, 32]),
             set(self.pd.generators))
         self.assertEqual(
-            set("g1 g4 g5 g6 g7 g8 g9".split()),
+            set("g1 g4 g5 g6 g7 g8".split()),
             set(self.pd.supply))
-        self.assertAlmostEqualList(
-            [1.032, 1.72, 2.4],
-            [item.p for item in self.pd.generators.values()])
 
 
 #------------------------------------------------------------------------------
@@ -762,9 +745,9 @@ Line.con = [ ...
 ];
 
 PV.con = [ ... 
-  1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1;
-  2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1;
-  7 100 138 2.4 1.025 1.8 0.0 1.05 0.95 1.0 1;
+  1 100 138 0.0 1.035 0.8 -0.5 1.05 0.95 1.0 1;
+  2 100 138 0.0 1.035 0.8 -0.5 1.05 0.95 1.0 1;
+  7 100 138 0.0 1.025 1.8 0.0 1.05 0.95 1.0 1;
 ];
 
 """)

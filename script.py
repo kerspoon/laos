@@ -638,10 +638,10 @@ def test005():
 
     data = """
            [example_4] pf
-             # remove line a26 
-             # remove line a19
-             # remove line a21
-             # remove line a22
+             remove line a24
+             remove line a19
+             remove line a18
+             remove line a15
            """
 
     scenario = text_to_scenario(data)
@@ -656,7 +656,7 @@ def test005():
 
 def test006():
 
-    clean_files()
+    #clean_files()
 
     def dosim(title, simtype):
         matlab_filename = "matlab_" + title

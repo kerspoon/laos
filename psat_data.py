@@ -261,7 +261,9 @@ class PsatData(object):
            But where there was only one gen on a bus anyway it 
            doesn't have a virtual bus hence might have a load.
         """
+
         bus_no = self.supply[supply_id].bus_no
+        assert bus_no in self.generators, "missing generator info, slack?"
         self.mismatch -= self.generators[bus_no].p 
         del self.generators[bus_no]
         del self.supply[supply_id]
@@ -389,8 +391,7 @@ def fix_mismatch(mismatch, gen_power, gen_limit):
         assert(total_gen != 0)
   
         multiplier = 1.0 + (mismatch / total_gen)
-        assert(0 <= multiplier <= 2)
-        # print "multiplier", multiplier
+        assert (0 <= multiplier <= 2), "multiplier: " + str(multiplier)
   
         idx_gen = find_limit(multiplier)
         if idx_gen is None:

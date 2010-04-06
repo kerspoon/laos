@@ -32,6 +32,7 @@ import os
 import re 
 import logging
 import itertools
+from collections import defaultdict
 
 #------------------------------------------------------------------------------
 # Logging:
@@ -105,6 +106,35 @@ def TEST_split_every():
     # should work with empty list. 
     assert list(split_every(100, [])) == []
 # TEST_split_every()
+
+
+#------------------------------------------------------------------------------
+# duplicates_exist
+#------------------------------------------------------------------------------
+
+def duplicates_exist(iterable):
+    """
+    duplicates_exist [x] -> Bool
+    Are there two or more elements in this list that are equal?
+    could sort then compare adjacent or by building a count of elements and 
+    making sure that count is all 1.
+    """
+
+    tally = defaultdict(int)
+    for x in iterable:
+        tally[x] += 1
+
+    return not all(count == 1 for count in tally.values()) 
+
+
+def TEST_duplicates_exist():
+    assert duplicates_exist([0,1,2,3]) == False
+    assert duplicates_exist([2,1,2,3]) == True
+    assert duplicates_exist([1,1,2,3]) == True
+    assert duplicates_exist([1,1,1,1]) == True
+    assert duplicates_exist([-4,8,2,7]) == False
+# TEST_duplicates_exist()
+
 
 #------------------------------------------------------------------------------
 #  as_csv :: [T], str -> str
@@ -185,7 +215,8 @@ class struct(object):
             elif self.typemap[member] == "str":
                 self.__dict__[member] = str(self.__dict__[member])
             else:
-                raise Exception("bad datatype. expected (int, real, bool, str) got " + self.typemap[member])
+                raise Exception("bad datatype. expected (int, real, bool, str) got " + 
+                                self.typemap[member])
 
     def check_entries(self):
         """make sure that all the entries are added"""

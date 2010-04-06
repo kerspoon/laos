@@ -27,9 +27,10 @@ psat_data.py - PsatData - psat_file - psat
 #  Imports:
 #------------------------------------------------------------------------------
 
-from misc import struct, read_struct
+from misc import struct, read_struct, as_csv, duplicates_exist
 import re
 import unittest
+from StringIO import StringIO
 from modifiedtestcase import ModifiedTestCase
 
 #------------------------------------------------------------------------------
@@ -45,27 +46,45 @@ def write_section(stream, items, title):
 
     stream.write(title + ".con = [ ... \n")
     for key, value in sorted(items.items()):
-        stream.write("  " + str(value) + ";\n")
-    stream.write(" ];\n")
+        if "cid" == value.entries[-1]:
+            tmp = as_csv([value.__dict__[x] for x in value.entries[:-1]], " ")
+            stream.write("  " + tmp + "; %" + value.cid + "\n")
+        else:
+            stream.write("  " + str(value) + ";\n")
+    stream.write("];\n\n")
 
 
-def read_section(stream, items, classtype):
+def read_section(stream, classtype):
     """read one section of Matlab file, assuming the header is done.
        and assuming that each line is one row ended by a semicolon. 
+       In addition to the matlab spec a compoent can have an ID specified 
+       by adding %XX to the end of its line where XX is the id. 
     """
+
+    items = []
 
     for n,line in enumerate(stream):
         line = line.strip()
 
+        # check if we are done 
         if re.match("\A *\] *; *\Z", line): # if line == "];"
             break
 
-        if len(line) == 0 or line.startswith("#"):
+        # skip comments
+        if len(line) == 0 or line.startswith("%"):
             continue
 
+        # everything should be lowercase, we don't care about the ';'
         cols = [x.lower() for x in line.replace(";"," ").split()]
-        items[n] = read_struct(classtype, cols)
 
+        # strip comment delimiter from component ID
+        # e.g. change '%a1' to 'a1' if it exists
+        if cols[-1].startswith("%"):
+            cols[-1] = cols[-1][1:]
+
+        items.append(read_struct(classtype, cols))
+
+    return items
 
 #------------------------------------------------------------------------------
 #
@@ -80,8 +99,8 @@ class PsatData(object):
         types = "int int real real int int".split()
  
     class Line(struct):
-        entries = "fbus tbus s_rating v_rating f_rating length v_ratio r x b tap shift i_limit p_limit s_limit status".split()
-        types = "int int int int int real real real real real real real real real real int".split()
+        entries = "fbus tbus s_rating v_rating f_rating length v_ratio r x b tap shift i_limit p_limit s_limit status cid".split()
+        types = "int int int int int real real real real real real real real real real int str".split()
  
     class Slack(struct):
         entries = "bus_no s_rating v_rating v_magnitude ref_angle q_max q_min v_max v_min p_guess lp_coeff ref_bus status".split()
@@ -104,8 +123,8 @@ class PsatData(object):
         types = "int int real real real real real real real real real real real real real real real int".split()
 
     class Supply(struct):
-        entries = "bus_no s_rating p_direction p_bid_max p_bid_min p_bid_actual p_fixed p_proportional p_quadratic q_fixed q_proportional q_quadratic commitment cost_tie_break lp_factor q_max q_min cost_cong_up cost_cong_down status".split()
-        types = "int int real real real real real real real real real real real real real real real real real int".split()
+        entries = "bus_no s_rating p_direction p_bid_max p_bid_min p_bid_actual p_fixed p_proportional p_quadratic q_fixed q_proportional q_quadratic commitment cost_tie_break lp_factor q_max q_min cost_cong_up cost_cong_down status cid".split()
+        types = "int int real real real real real real real real real real real real real real real real real int str".split()
 
     def __init__(self):
         self.busses = {}
@@ -119,59 +138,56 @@ class PsatData(object):
         self.mismatch = 0.0
 
     def read(self, stream):
-
+     
         def title_matches(line, title):
-            #todo: replace with regexp
             return line.startswith(title)
-
+     
+        def read_as_cid(storage, classtype):
+            assert len(storage) == 0
+            for item in read_section(stream, classtype):
+                storage[item.cid] = item
+            assert len(storage) >= 0
+     
+        def read_as_bus_no(storage, classtype):
+            assert len(storage) == 0
+            for item in read_section(stream, classtype):
+                storage[item.bus_no] = item
+            assert len(storage) >= 0
+            
         for line in stream:
             line = line.strip()
-
-            if len(line) == 0 or line.startswith("#"):
+     
+            if len(line) == 0 or line.startswith("%"):
                 continue
             elif title_matches(line, "Bus.con"):
-                assert len(self.busses) == 0
-
-                # silly little hack to get busses[id].bus_no == id
-                tmp = {}
-                read_section(stream, tmp, self.Bus)
-                for bus in tmp.values():
-                    self.busses[bus.bus_no] = bus
-
-                # make sure that hack worked
-                assert len(self.busses) >= 1
-                for idx,bus in self.busses.items():
-                    assert bus.bus_no == idx, str(bus.bus_no) + " " + str(idx)
+                read_as_bus_no(self.busses, self.Bus)
             elif title_matches(line, "Line.con"):
-                assert len(self.lines) == 0
-                read_section(stream, self.lines, self.Line)
-                assert len(self.lines) >= 1
+                read_as_cid(self.lines, self.Line)
             elif title_matches(line, "SW.con"):
-                assert len(self.slack) == 0
-                read_section(stream, self.slack, self.Slack)
-                assert len(self.slack) == 1
+                read_as_bus_no(self.slack, self.Slack)
             elif title_matches(line, "PV.con"):
-                assert len(self.generators) == 0
-                read_section(stream, self.generators, self.Generator)
-                assert len(self.generators) >= 0
+                read_as_bus_no(self.generators, self.Generator)
             elif title_matches(line, "PQ.con"):
-                assert len(self.loads) == 0
-                read_section(stream, self.loads, self.Load)
-                assert len(self.loads) >= 1
+                read_as_bus_no(self.loads, self.Load)
             elif title_matches(line, "Shunt.con"):
-                assert len(self.shunts) == 0
-                read_section(stream, self.shunts, self.Shunt)
-                assert len(self.shunts) >= 0
-            elif title_matches(line, "Demand.con"):
-                assert len(self.demand) == 0
-                read_section(stream, self.demand, self.Demand)
-                assert len(self.demand) >= 0 
+                read_as_bus_no(self.shunts, self.Shunt)
             elif title_matches(line, "Supply.con"):
-                assert len(self.supply) == 0
-                read_section(stream, self.supply, self.Supply)
-                assert len(self.supply) >= 0
+                read_as_cid(self.supply, self.Supply)
+            elif title_matches(line, "Demand.con"):
+                read_as_bus_no(self.demand, self.Demand)
             else:
-                raise Exception("expected matlab section, got " + line)
+                raise Exception("expected matlab section, got '" + line + "'")
+
+        self.invariant()
+
+    def invariant(self):
+        passed = self.in_limits()
+
+        if duplicates_exist(gen.bus_no for gen in self.generators.values()):
+            print "PsatData invariant: only one bus per generator"
+            passed = False
+
+        # we could also make sure that the key and cid/bus_no match.
             
     def write(self, stream):
         write_section(stream, self.busses, "Bus")
@@ -188,6 +204,23 @@ class PsatData(object):
         assert self.busses[bus_no].bus_no == bus_no
         del self.busses[bus_no]
 
+        # as we now have virtal busses that connect to generators
+        # we need to find and delete any of those hat connect to
+        # this bus. 
+        # We can find them by using the cid of the lines
+        # find all lines with who's cid starts with "C" that 
+        # connect to this bus
+
+        for line in self.lines.values():
+            if line.fbus == bus_no:
+                self.remove_line(line.cid)
+                if line.cid.startswith("c"):
+                    self.remove_bus(line.tbus)
+            elif line.tbus == bus_no:
+                self.remove_line(line.cid)
+                if line.cid.startswith("c"):
+                    self.remove_bus(line.fbus)
+
         # kill all connecting items
         for idx, shunt in self.shunts.items():
             if shunt.bus_no == bus_no:
@@ -201,12 +234,6 @@ class PsatData(object):
             if item.bus_no == bus_no:
                 del self.supply[idx]
 
-        for idx, line in self.lines.items():
-            if line.fbus == bus_no or line.tbus == bus_no:
-                self.remove_line(idx, 
-                                 line.fbus,
-                                 line.tbus)
-
         for idx, gen in self.generators.items():
             if gen.bus_no == bus_no:
                 self.mismatch -= gen.p
@@ -217,60 +244,46 @@ class PsatData(object):
                 self.mismatch += load.p
                 del self.loads[idx]
 
-        assert len(self.slack) == 1
-        assert self.slack[0].bus_no != bus_no, "todo: deal with deleting slack bus"
+        # really should be an 'assert' not an 'if' but make testing easier
+        if len(self.slack) == 1:
+            slack = self.slack.values()[0]
+            assert slack.bus_no != bus_no, "can't delete slack bus"
 
-    def remove_line(self, line_id, fbus, tbus):
-        assert self.lines[line_id].fbus == fbus
-        assert self.lines[line_id].tbus == tbus
+    def remove_line(self, line_id):
         del self.lines[line_id]
         # TODO:: deal with islanding
 
-    def remove_generator(self, supply_id, bus_no=None):
-        """kill the specified supply and reduce the corosponding 
-           PV element (self.generators) by the correct amount"""
-        
-        if bus_no:
-            assert self.supply[supply_id].bus_no == bus_no
-        else:
-            bus_no = self.supply[supply_id].bus_no
+    def remove_generator(self, supply_id):
+        """kill the specified supply and corresponding generator
+           with the requiement that there is only one generator
+           per busbar.
+           Could kill the line and busbar as well in most cases.
+           But where there was only one gen on a bus anyway it 
+           doesn't have a virtual bus hence might have a load.
+        """
 
-        gens = [n for n,x in enumerate(self.generators.values()) 
-                    if x.bus_no == bus_no]
-        assert len(gens) == 1
-        gen_id = gens[0]
-
-        # TODO set-up mini pool system for deciding power of each gen 
-        # for now assume they distributed power equally.
-        num_units = len([x for x in self.supply.values() if x.bus_no == bus_no])
-        unit_power = self.generators[gen_id].p / num_units
-
+        bus_no = self.supply[supply_id].bus_no
+        assert bus_no in self.generators, "missing generator info, slack?"
+        self.mismatch -= self.generators[bus_no].p 
+        del self.generators[bus_no]
         del self.supply[supply_id]
-        self.mismatch -= unit_power
-        self.generators[gen_id].p -= unit_power
 
     def set_all_demand(self, value):
+        # Note:: should I change P, Q or both.
         for load in self.loads.values():
-            # Note:: should I change P, Q or both. 
-            load.p *= value
-
-#     def set_all_supply(self, value):
-#         # can't set this simply it depends on the bid price.
-#         raise Exception("not implemented")
-#  
-#     def set_demand(self, bus_no, value):
-#         raise Exception("not implemented")
-#  
-#     def set_supply(self, bus_no, value):
-#         # can't set this simply it depends on the bid price.
-#         raise Exception("not implemented")
+            newval  = load.p * value
+            self.mismatch += load.p - newval
+            load.p = newval
+            self.demand[load.bus_no].p_bid_max = newval
+            self.demand[load.bus_no].p_bid_min = newval
 
     def fix_mismatch(self):
         """
         Changes the generators power to compensate for the imbalance caused 
         by remove_* or set_*. It sets each generator proportionally based 
         upon it's current generating power (though it respects generator 
-        limits). 
+        limits). We then need to check limits, though if the algorithm is
+        working we shouldn't need to.
 
         It does this by using `self.mismatch`
         TODO: Not sure what to do with reactive power
@@ -279,16 +292,64 @@ class PsatData(object):
         """
 
         if self.mismatch == 0:
+            assert(self.in_limits())
             return
 
-        res = fix_mismatch(
-            self.mismatch, 
-            [g.p for g in self.generators], 
-            [g.s_rating for g in self.generators])
+        scheduleable_generators = self.generators.values()
 
-        for n in range(len(self.generators)):
-            self.generators[n].p = res[n]
+        powers = [gen.p for gen in scheduleable_generators]
 
+        limits = []
+        for gen in scheduleable_generators:
+            limits.append(sum(supply.p_bid_max for supply in 
+                              self.supply.values() 
+                              if supply.bus_no == gen.bus_no))
+
+        # print "-----"
+        # for x,y in zip(powers, limits):
+        #     print x,y
+        # print "-----"
+
+        res = fix_mismatch(-self.mismatch, powers, limits)
+
+        for newp, generator in zip(res, scheduleable_generators):
+            generator.p = newp
+
+        assert(self.in_limits())
+    
+    def in_limits(self):
+        """
+        Checks that generator power is between the sum of all supply min and
+        max bid. Checks that slack and generator voltage is within 
+        limit. 
+        requires all min bid to be <= 0 and all max bid to be >= 0.
+        """
+
+        inlimit = True
+        for generator in self.generators.values():
+            bus_no = generator.bus_no
+            supplies = [s for s in self.supply.values() if s.bus_no == bus_no]
+            # assert len(supplies) > 1 # often true but not needed.
+            max_bid = sum(s.p_bid_max for s in supplies)
+            min_bid = sum(s.p_bid_min for s in supplies)
+
+            if not (min_bid <= generator.p <= max_bid):
+                print "generator", bus_no , "power limit:", 
+                print min_bid, "<=", generator.p, "<=", max_bid
+                inlimit = False
+
+            if not(generator.v_min <= generator.v <= generator.v_max):
+                print "generator", bus_no, "volt limit:",
+                print generator.v_min, "<=", generator.v, "<=", generator.v_max
+                inlimit = False
+
+        for slack in self.slack.values():
+            if not(slack.v_min <= slack.v_magnitude <= slack.v_max):
+                print "slack", slack.bus_no, "volt limit:",
+                print slack.v_min, "<=", slack.v_magnitude, "<=", slack.v_max
+                inlimit = False
+
+        return inlimit
 
 #------------------------------------------------------------------------------
 #
@@ -430,42 +491,93 @@ class Test_kill_lines(ModifiedTestCase):
 
     def setUp(self):
         self.pd = PsatData()
-        self.lines = [
-            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1",
-            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1",
-            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1",
-            "1 5 100 138 60 0.0 0.0 0.0218 0.0845 0.0229 0.0 0.0 2.08 0.0 2.2 1",
-            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1"]
-        for n,line in enumerate(self.lines):
-            self.pd.lines[n] = read_struct(PsatData.Line, line.split())
- 
-    def util_pprint(self, collection):
-        return [str(value) for key, value in sorted(collection.items())]
+        self.stream = StringIO("""Line.con = [ ... 
+1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1; %a1
+1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1; %a2
+1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1; %a3
+1 5 100 138 60 0.0 0.0 0.0218 0.0845 0.0229 0.0 0.0 2.08 0.0 2.2 1; %a4
+2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1; %a5
+];""")
+        self.pd.read(self.stream)
+
+    def test_remove_none(self):
+        self.assertEqual(
+            set("a1 a2 a3 a4 a5".split()), 
+            set(self.pd.lines))
+
+    def test_remove_first(self):
+        self.pd.remove_line("a1")
+        self.assertEqual(
+            set("a2 a3 a4 a5".split()), 
+            set(self.pd.lines))
         
-    def test_1(self):
-        self.pd.remove_line(0, 1, 2)
+    def test_remove_last(self):
+        self.pd.remove_line("a5")
         self.assertEqual(
-            self.util_pprint(self.pd.lines),
-            self.lines[1:])
+            set("a1 a2 a3 a4".split()), 
+            set(self.pd.lines))
 
-    def test_2(self):
-        self.pd.remove_line(1, 1, 3)
+    def test_remove_middle(self):
+        self.pd.remove_line("a3")
         self.assertEqual(
-            self.util_pprint(self.pd.lines),
-            [self.lines[0]] + self.lines[2:])
+            set("a1 a2 a4 a5".split()), 
+            set(self.pd.lines))
 
-    def test_3(self):
-        self.pd.remove_line(2, 1, 3)
+    def test_remove_double(self):
+        self.pd.remove_line("a3")
+        self.pd.remove_line("a4")
         self.assertEqual(
-            self.util_pprint(self.pd.lines),
-            self.lines[:2] + self.lines[3:])
+            set("a1 a2 a5".split()), 
+            set(self.pd.lines))
 
-    def test_4(self):
-        self.pd.remove_line(2, 1, 3)
-        self.pd.remove_line(4, 2, 4)
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
+class Test_kill_bus(ModifiedTestCase):
+    """note: doesn't check cascade killing"""
+
+    def setUp(self):
+        self.pd = PsatData()
+        self.stream = StringIO("""Bus.con = [ ... 
+1 138 1 0 2 1;
+2 138 1 0 2 1;
+3 138 1 0 2 1;
+4 138 1 0 2 1;
+];""")
+        self.pd.read(self.stream)
+
+    def test_remove_none(self):
         self.assertEqual(
-            self.util_pprint(self.pd.lines),
-            self.lines[:2] + [self.lines[3]])
+            set([1, 2, 3, 4]),
+            set(self.pd.busses))
+        
+    def test_remove_first(self):
+        self.pd.remove_bus(1)
+        self.assertEqual(
+            set([2, 3, 4]),
+            set(self.pd.busses))
+
+    def test_remove_last(self):
+        self.pd.remove_bus(4)
+        self.assertEqual(
+            set([1, 2, 3]),
+            set(self.pd.busses))
+
+    def test_remove_middle(self):
+        self.pd.remove_bus(3)
+        self.assertEqual(
+            set([1, 2, 4]),
+            set(self.pd.busses))
+
+    def test_remove_double(self):
+        self.pd.remove_bus(3)
+        self.pd.remove_bus(2)
+        self.assertEqual(
+            set([1, 4]),
+            set(self.pd.busses))
 
 
 #------------------------------------------------------------------------------
@@ -477,80 +589,76 @@ class Test_kill_generator(ModifiedTestCase):
 
     def setUp(self):
         self.pd = PsatData()
-        self.supply = [
-            ("1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 "
-             "0.0 0.0 1.0 0.1 0.0 0.0 0.0 1"),
-            ("2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 "
-             "0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"),
-            ("7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0 0"
-             ".0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1"),
-            ("7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0 0"
-             ".0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1"),
-            ("7 100 0.8 1.0 0.25 0.0 -0.65 17.9744 0.027484 0.0 0.0 0"
-             ".0 0.0 0.0 1.0 0.6 0.0 0.0 0.0 1")]
+        self.stream = StringIO("""Supply.con = [ ... 
+ 25 100 0.81 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g1
+ 26 100 0.72 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g2
+ 27 100 0.63 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g3
+ 28 100 0.54 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g4
+ 29 100 0.45 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g5
+ 30 100 0.36 1.0 0.0 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g6
+ 31 100 0.27 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g7
+ 32 100 0.18 1.0 0.0 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g8
+];
 
-        self.generators = [
-            "1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1",
-            "2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1",
-            "7 100 138 2.4 1.025 1.8 0.0 1.05 0.95 1.0 1"]
+PV.con = [ ... 
+ % ------------------- Bus 1
+ 25  100  138  0.81  1.035 0.10  0    1.05  0.95  1  1;
+ 26  100  138  0.72  1.035 0.10  0    1.05  0.95  1  1;
+ 27  100  138  0.63  1.035 0.30 -0.25 1.05  0.95  1  1;
+ 28  100  138  0.54  1.035 0.30 -0.25 1.05  0.95  1  1;
+ % ------------------- Bus 2
+ 29  100  138  0.45  1.035 0.10  0    1.05  0.95  1  1;
+ 30  100  138  0.36  1.035 0.10  0    1.05  0.95  1  1;
+ 31  100  138  0.27  1.035 0.30 -0.25 1.05  0.95  1  1;
+ 32  100  138  0.18  1.035 0.30 -0.25 1.05  0.95  1  1;
+];""")
+        self.pd.read(self.stream)
 
-        for n,item in enumerate(self.supply):
-            self.pd.supply[n] = read_struct(PsatData.Supply, item.split())
- 
-        for n,item in enumerate(self.generators):
-            self.pd.generators[n] = read_struct(PsatData.Generator, item.split())
- 
-    def util_pprint(self, collection):
-        return [str(value) for key, value in sorted(collection.items())]
-        
-    def test_0(self):
+    def test_remove_none(self):
         self.assertEqual(
-            self.util_pprint(self.pd.supply),
-            self.supply)
+            set([25, 26, 27, 28, 29, 30, 31, 32]),
+            set(self.pd.generators))
         self.assertEqual(
-            self.util_pprint(self.pd.generators),
-            self.generators)
+            set("g1 g2 g3 g4 g5 g6 g7 g8".split()),
+            set(self.pd.supply))
 
-    def test_1(self):
-        self.pd.remove_generator(0, 1)
-        self.assertEqual(
-            self.util_pprint(self.pd.supply),
-            self.supply[1:])
-        self.assertEqual(
-            self.util_pprint(self.pd.generators),
-            ["1 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1"] + self.generators[1:])
 
-    def test_2(self):
-        self.pd.remove_generator(3, 1)
+    def test_remove_first(self):
+        self.pd.remove_generator("g1")
         self.assertEqual(
-            self.util_pprint(self.pd.supply),
-            self.supply[:3] + self.supply[4:])
+            set([26, 27, 28, 29, 30, 31, 32]),
+            set(self.pd.generators))
         self.assertEqual(
-            self.util_pprint(self.pd.generators),
-            ["1 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1"] + self.generators[1:])
+            set("g2 g3 g4 g5 g6 g7 g8".split()),
+            set(self.pd.supply))
 
-    def test_3(self):
-        self.pd.remove_generator(3, 1)
-        self.pd.remove_generator(4, 2)
+    def test_remove_last(self):
+        self.pd.remove_generator("g8")
         self.assertEqual(
-            self.util_pprint(self.pd.supply),
-            self.supply[:3] + self.supply[5:])
+            set([25, 26, 27, 28, 29, 30, 31]),
+            set(self.pd.generators))
         self.assertEqual(
-            self.util_pprint(self.pd.generators),
-            ["1 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1",
-             "2 100 138 1.29 1.035 0.8 -0.5 1.05 0.95 1.0 1"] + self.generators[2:])
+            set("g1 g2 g3 g4 g5 g6 g7".split()),
+            set(self.pd.supply))
+
+    def test_remove_middle(self):
+        self.pd.remove_generator("g5")
+        self.assertEqual(
+            set([25, 26, 27, 28, 30, 31, 32]),
+            set(self.pd.generators))
+        self.assertEqual(
+            set("g1 g2 g3 g4 g6 g7 g8".split()),
+            set(self.pd.supply))
+
+    def test_remove_double(self):
+        self.pd.remove_generator("g2")
+        self.pd.remove_generator("g3")
+        self.assertEqual(
+            set([25, 28, 29, 30, 31, 32]),
+            set(self.pd.generators))
+        self.assertEqual(
+            set("g1 g4 g5 g6 g7 g8".split()),
+            set(self.pd.supply))
 
 
 #------------------------------------------------------------------------------
@@ -558,116 +666,176 @@ class Test_kill_generator(ModifiedTestCase):
 #------------------------------------------------------------------------------
 
 
-class Test_kill_bus(ModifiedTestCase):
-
-    def util_pprint(self, collection):
-        return [str(value) for key, value in sorted(collection.items())]
-        
-    def test_1(self):
-        pd = PsatData()
-        busses = [
-            "1 138 1 0 2 1",
-            "2 138 1 0 2 1",
-            "3 138 1 0 2 1",
-            "4 138 1 0 2 1"]
-
-        for n, item in enumerate(busses):
-            pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
-
-        pd.remove_bus(1)
-
-        self.assertEqual(self.util_pprint(pd.generators), busses[1:])
-
-    def test_2(self):
-        pd = PsatData()
-        busses = [
-            "1 138 1 0 2 1",
-            "2 138 1 0 2 1",
-            "3 138 1 0 2 1",
-            "4 138 1 0 2 1"]
-        
-        for n, item in enumerate(busses):
-            pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
-
-        pd.remove_bus(2)
-
-        self.assertEqual(self.util_pprint(pd.generators), [busses[0]] + busses[2:])
-
-
-class Test_kill_bus2(ModifiedTestCase):
+class Test_kill_bus_cascade(ModifiedTestCase):
 
     def setUp(self):
         self.pd = PsatData()
-        self.busses = [
-            "1 138 1.0 0.0 2 1",
-            "2 138 1.0 0.0 2 1",
-            "3 138 1.0 0.0 2 1",
-            "4 138 1.0 0.0 2 1"]
-        self.lines = [
-            "1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1",
-            "1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1",
-            "1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1",
-            "2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1"]
-        self.supply = [
-            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "1 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
-            "1 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
-            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "2 100 0.1 0.2 0.1 0.0 1.72 24.8415 0.36505 0.0 0.0 0.0 0.0 0.0 1.0 0.1 0.0 0.0 0.0 1",
-            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1",
-            "2 100 0.76 0.76 0.152 0.0 3.5 10.2386 0.038404 0.0 0.0 0.0 0.0 0.0 1.0 0.3 -0.25 0.0 0.0 1"]
-        self.generators = [
-            "1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1",
-            "2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1"]
+        self.stream = StringIO("""Bus.con = [ ... 
+1 138 1 0 2 1;
+2 138 1 0 2 1;
+3 138 1 0 2 1;
+4 138 1 0 2 1;
+];
 
-        for n,item in enumerate(self.supply):
-            self.pd.supply[n] = read_struct(PsatData.Supply, item.split())
- 
-        for n,item in enumerate(self.generators):
-            self.pd.generators[n] = read_struct(PsatData.Generator, item.split())
- 
-        for n,item in enumerate(self.busses):
-            self.pd.busses[n+1] = read_struct(PsatData.Bus, item.split())
+Line.con = [ ... 
+1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1; %a1
+1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1; %a2
+1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1; %a3
+2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1; %a5
+];
 
-        for n,line in enumerate(self.lines):
-            self.pd.lines[n] = read_struct(PsatData.Line, line.split())
+Supply.con = [ ... 
+ 1 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g1 
+ 1 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g2 
+ 1 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g3
+ 1 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g4
+ 1 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g5 
+ 2 100 0.1 0.2 0.1 0 1.72 24.8415 0.36505 0 0 0 0 0 1 0.1 0 0 0 1; %g6 
+ 2 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g7
+ 2 100 0.76 0.76 0.152 0 3.5 10.2386 0.038404 0 0 0 0 0 1 0.3 -0.25 0 0 1; %g8
+];
 
-        self.pd.slack[0] = read_struct(
-            PsatData.Slack,
-            "13 100 230 1.02 0 2.4 0 1.05 0.95 4.7321 1 1 1".split())
+PV.con = [ ... 
+ 1 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1
+ 2 100 138 1.72 1.035 0.8 -0.5 1.05 0.95 1.0 1
+];""")
+        self.pd.read(self.stream)
 
-    def util_pprint(self, collection):
-        return [str(value) for key, value in sorted(collection.items())]
-                
-    def test_1(self):
+    def test_remove_none(self):
         self.assertEqual(
-            self.util_pprint(self.pd.busses),
-            self.busses)
+            set([1, 2, 3, 4]),
+            set(self.pd.busses))
         self.assertEqual(
-            self.util_pprint(self.pd.lines),
-            self.lines)
+            set("a1 a2 a3 a5".split()), 
+            set(self.pd.lines))
         self.assertEqual(
-            self.util_pprint(self.pd.supply),
-            self.supply)
+            set("g1 g2 g3 g4 g5 g6 g7 g8".split()),
+            set(self.pd.supply))
         self.assertEqual(
-            self.util_pprint(self.pd.generators),
-            self.generators)
+            set([1, 2]),
+            set(self.pd.generators))
 
-    def test_2(self):
+    def test_remove_first(self):
         self.pd.remove_bus(1)
         self.assertEqual(
-            self.util_pprint(self.pd.busses),
-            self.busses[1:])
+            set([2, 3, 4]),
+            set(self.pd.busses))
         self.assertEqual(
-            self.util_pprint(self.pd.lines),
-            [self.lines[3]])
+            set("a5".split()), 
+            set(self.pd.lines))
         self.assertEqual(
-            self.util_pprint(self.pd.supply),
-            self.supply[4:])
+            set("g6 g7 g8".split()),
+            set(self.pd.supply))
         self.assertEqual(
-            self.util_pprint(self.pd.generators),
-            self.generators[1:])
+            set([2]),
+            set(self.pd.generators))
+
+    def test_remove_last(self):
+        self.pd.remove_bus(2)
+        self.assertEqual(
+            set([1, 3, 4]),
+            set(self.pd.busses))
+        self.assertEqual(
+            set("a2 a3".split()), 
+            set(self.pd.lines))
+        self.assertEqual(
+            set("g1 g2 g3 g4 g5".split()),
+            set(self.pd.supply))
+        self.assertEqual(
+            set([1]),
+            set(self.pd.generators))
+
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
+class Test_read_write(ModifiedTestCase):
+
+    def test_basic(self):
+        pd = PsatData()
+        istream = StringIO("""Bus.con = [ ... 
+  1 138 1.0 0.0 2 1;
+  2 138 1.0 0.0 2 1;
+  3 138 1.0 0.0 2 1;
+  4 138 1.0 0.0 2 1;
+];
+
+Line.con = [ ... 
+  1 2 100 138 60 0.0 0.0 0.0026 0.0139 0.4611 0.0 0.0 1.93 0.0 2.0 1; %a1
+  1 3 100 138 60 0.0 0.0 0.0546 0.2112 0.0572 0.0 0.0 2.08 0.0 2.2 1; %a2
+  1 3 100 138 60 0.0 0.0 0.0268 0.1037 0.0281 0.0 0.0 2.08 0.0 2.2 1; %a3
+  2 4 100 138 60 0.0 0.0 0.0328 0.1267 0.0343 0.0 0.0 2.08 0.0 2.2 1; %a5
+];
+
+PV.con = [ ... 
+  1 100 138 0.0 1.035 0.8 -0.5 1.05 0.95 1.0 1;
+  2 100 138 0.0 1.035 0.8 -0.5 1.05 0.95 1.0 1;
+  7 100 138 0.0 1.025 1.8 0.0 1.05 0.95 1.0 1;
+];
+
+""")
+        pd.read(istream)
+        ostream = StringIO()
+        pd.write(ostream)
+        self.assertEqual(istream.getvalue(), ostream.getvalue())
+
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+
+
+class Test_set_all_demand(ModifiedTestCase):
+
+    def setUp(self):
+        self.pd = PsatData()
+        istream = StringIO("""PQ.con = [ ... 
+  1   100  138  1.00  0.10  1.05  0.95  1  1;
+  2   100  138  1.00  0.10  1.05  0.95  1  1;
+  3   100  138  1.00  0.10  1.05  0.95  1  1;
+  4   100  138  1.00  0.10  1.05  0.95  1  1;
+  5   100  138  1.00  0.10  1.05  0.95  1  1;
+  6   100  138  1.00  0.10  1.05  0.95  1  1;
+ ];
+
+Demand.con = [ ... 
+   1  100  1.00  0.242  1.00 1.00  0  0  18  0  0  0  0  0  0  0  0  1;   
+   2  100  1.00  0.22   1.00 1.00  0  0  25  0  0  0  0  0  0  0  0  1;   
+   3  100  1.00  0.407  1.00 1.00  0  0  19  0  0  0  0  0  0  0  0  1;   
+   4  100  1.00  0.165  1.00 1.00  0  0  24  0  0  0  0  0  0  0  0  1;   
+   5  100  1.00  0.154  1.00 1.00  0  0  22  0  0  0  0  0  0  0  0  1;   
+   6  100  1.00  0.308  1.00 1.00  0  0  19  0  0  0  0  0  0  0  0  1;   
+ ];
+""")
+        self.pd.read(istream)
+        self.assertEqual(self.pd.mismatch, 0)
+
+    def test_one(self):
+        self.pd.set_all_demand(1)
+        self.assertAlmostEqual(self.pd.mismatch, 0)
+
+    def test_two(self):
+        self.pd.set_all_demand(2)
+        self.assertAlmostEqual(self.pd.mismatch, -6)
+        
+    def test_four(self):
+        self.pd.set_all_demand(4)
+        self.assertAlmostEqual(self.pd.mismatch, -18)
+        
+    def test_half(self):
+        self.pd.set_all_demand(0.5)
+        self.assertAlmostEqual(self.pd.mismatch, 3)
+
+    def test_0_9(self):
+        self.pd.set_all_demand(0.9)
+        self.assertAlmostEqual(self.pd.mismatch, 0.6)
+
+    def test_0_1(self):
+        self.pd.set_all_demand(0.1)
+        self.assertAlmostEqual(self.pd.mismatch, 5.4)
+
 
 #------------------------------------------------------------------------------
 #
@@ -676,4 +844,3 @@ class Test_kill_bus2(ModifiedTestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

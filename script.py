@@ -80,6 +80,7 @@ def make_failures(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.failures(str(x)))
+    assert count == len(batch)
     return batch
 
 
@@ -145,8 +146,8 @@ def report_to_psat(report, psat):
        angle, and power values from `report`.
     """
 
-
-    print "WARNING: ADD THESE LINES BACK IN"
+    # TODO: if we can work out why PSAT has discrepencies in the 
+    #       number of items in input and output then add these line back
 
     # assert len(psat.lines) == report.num_line
     # assert len(psat.slack) == 1
@@ -159,20 +160,22 @@ def report_to_psat(report, psat):
     new_psat = deepcopy(psat)
     pf = report.power_flow
 
-    slack = new_psat.slack[0]
+    slack = new_psat.slack.values()[0]
     slack.v_magnitude = pf[slack.bus_no].v
     slack.ref_angle = pf[slack.bus_no].phase
     # slack.p_guess = pf[slack.bus_no].pg
 
-    for gen in new_psat.generators:
+    for gen in new_psat.generators.values():
         assert pf[gen.bus_no] != None
         gen.p = pf[gen.bus_no].pg
         gen.v = pf[gen.bus_no].v
 
-    for load in new_psat.loads:
+    for load in new_psat.loads.values():
         assert pf[load.bus_no] != None
         load.p = pf[load.bus_no].pl
         load.q = pf[load.bus_no].ql
+
+    assert(new_psat.in_limits())
 
     return new_psat
 
@@ -201,26 +204,16 @@ def scenario_to_psat(scenario, psat):
 
     new_psat = deepcopy(psat)
 
-    for kill in scenario.kill["bus"]:
-        print kill
+    for kill in scenario.kill_bus:
         new_psat.remove_bus(kill)
-    for kill in scenario.kill["line"]:
-        print kill
+    for kill in scenario.kill_line:
         new_psat.remove_line(kill)
-    for kill in scenario.kill["generator"]:
-        print kill
+    for kill in scenario.kill_gen:
         new_psat.remove_generator(kill)
-    if scenario.all_supply:
-        new_psat.set_all_supply(scenario.all_supply)
     if scenario.all_demand:
         new_psat.set_all_demand(scenario.all_demand)
-    if not(len(scenario.supply) == 0 and len(scenario.demand) == 0):
-        raise Exception("not implemented")
 
-    # fix mismatch in powers 
-
-    
-    
+    new_psat.fix_mismatch()
     return new_psat
 
 
@@ -231,7 +224,8 @@ def batch_simulate(batch, psat, size=10):
        of size `size`. Modify `batch` in place. delete all temp files
        if it succedes 
 
-       Note:: what should we do on parsing error for report 
+       Note:: We need to say the scenario is a failure if it 
+              fails scenario_to_psat.
     """
 
     for n, group in enumerate(split_every(size, batch)):
@@ -275,7 +269,7 @@ def batch_simulate(batch, psat, size=10):
     clean_files()
 
 
-def single_simulate(psat, simtype, clean=True):
+def single_simulate(psat, simtype, title, clean=True):
     """func single_simulate      :: PsatData, Str, Bool -> PsatReport
        ----
        run matlab with the PsatData `psat` as either 
@@ -284,7 +278,6 @@ def single_simulate(psat, simtype, clean=True):
        remove temp files if specified
     """
 
-    title = "000"
     matlab_filename = "matlab_" + title
     psat_filename = "psat_" + title + ".m"
     report_filename = "psat_" + title + "_01.txt"
@@ -293,6 +286,7 @@ def single_simulate(psat, simtype, clean=True):
     single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
 
     # write the PsatData to file
+    assert(psat.in_limits())
     with open(psat_filename, "w") as psat_file:
         psat.write(psat_file)
 
@@ -315,7 +309,7 @@ def simulate_scenario(psat, scenario, clean=True):
     """
 
     new_psat = scenario_to_psat(scenario, psat)
-    return single_simulate(new_psat, scenario.simtype, clean)
+    return single_simulate(new_psat, scenario.simtype, scenario.title, clean)
 
 
 def single_matlab_script(filename, psat_filename, simtype):
@@ -337,6 +331,7 @@ def single_matlab_script(filename, psat_filename, simtype):
             matlab_stream.write("runpsat pf;\n")
         elif simtype == "opf":
             matlab_stream.write("OPF.basepg = 0;\n")
+            matlab_stream.write("OPF.basepl = 0;\n")
             matlab_stream.write("runpsat pf;\n")
             matlab_stream.write("runpsat opf;\n")
         else:
@@ -466,12 +461,11 @@ def example4():
     """one specified scenario, simulated"""
 
     clean_files()
-    clean = True
+    clean = False
 
     data = """
-    [outage247] opf
-remove generator G1
-          """
+           [example_4] pf
+           """
 
     scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
@@ -480,11 +474,35 @@ remove generator G1
     print "result = '" + str(report_in_limits(report)) + "'"
 
 
-example4()
+# example4()
 
 
 def example5():
-    pass 
+
+    clean_files()
+    clean = False
+
+    data = """
+           [base] opf
+           [rem_bus_1] opf
+             remove bus 1
+           [rem_li_a1] opf
+             remove line a1
+           [rem_gen_g1] opf
+             remove generator g1
+           [set_double] opf
+             set all demand 2.0
+           [set_half] opf
+             set all demand 0.5
+           """
+
+    batch = SimulationBatch()
+    batch.read(StringIO(data))
+    psat = read_psat("rts.m")
+
+    for scenario in batch:
+        report = simulate_scenario(psat, scenario, clean)
+        print "result = '" + str(report_in_limits(report)) + "'"
 
 
 # example5()
@@ -492,24 +510,61 @@ def example5():
 
 # -----------------------------------------------------------------------------
 
+def test001():
+    """
+    a system after OPF should not depend on the values of generator.p or
+    generator.v. These should be set by the OPF routine based upon price.
+
+    You have to temperarily delete asser(in_limits) for this to work.
+    """
+
+    clean_files()
+    clean = False
+
+    psat = read_psat("rts2.m")
+    report = single_simulate(psat, "opf", "base", clean)
+    print "base result = '" + str(report_in_limits(report)) + "'"
+
+    for gen in psat.generators.values():
+        gen.p = 1.0
+        gen.v = 1.0
+    report = single_simulate(psat, "opf", "unit", clean)
+    print "unit result = '" + str(report_in_limits(report)) + "'"
+
+    for gen in psat.generators.values():
+        gen.p = 10.0
+        gen.v = 10.0
+    report = single_simulate(psat, "opf", "ten", clean)
+    print "ten  result = '" + str(report_in_limits(report)) + "'"
+
+    for gen in psat.generators.values():
+        gen.p = 0.0
+        gen.v = 0.0
+    report = single_simulate(psat, "opf", "zero", clean)
+    print "zero result = '" + str(report_in_limits(report)) + "'"
+
+
+# test001()
+
 
 def test002():
-    """take the normal system, sim it and save report. 
-       do the same with a system where all PV busses have their 
-       P & V values set to 0. it shouldn't matter with an 'opf'.
     """
+    make sure that limits are hit when we set them really low
+    """
+
     clean_files()
+    clean = False
 
-    simtype = "opf"
+    psat = read_psat("rts.m")
+    report = single_simulate(psat, "pf", "base", clean)
+    print "base result = '" + str(report_in_limits(report)) + "'"
 
-    def helper(title):
-        matlab_filename = "matlab_" + title
-        psat_filename = title + ".m"
-        single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
-        simulate(matlab_filename)
-
-    helper("rts")
-    # helper("rts2")
+    for line in psat.lines.values():
+        line.i_limit = 0.01
+        #line.p_limit = 0.01
+        line.s_limit = 0.01
+    report = single_simulate(psat, "opf", "small", clean)
+    print "small result = '" + str(report_in_limits(report)) + "'"
 
 
 # test002()
@@ -522,7 +577,7 @@ def test003():
 
     clean_files()
 
-    simtype = "pf"
+    simtype = "opf"
 
     def helper(title):
         matlab_filename = "matlab_" + title
@@ -534,15 +589,104 @@ def test003():
 
     report = read_report("rts_01.txt")
     psat = read_psat("rts.m")
+
     new_psat = report_to_psat(report, psat)
 
-    with open("rts003.m","w") as new_psat_stream:
+    with open("test_d.m","w") as new_psat_stream:
         new_psat.write(new_psat_stream)
 
-    helper("rts003")
+    helper("test_d")
 
 
 # test003()
+
+
+def test004():
+    """
+    run two simulations on differnt files
+    """
+
+    clean_files()
+    clean = False
+
+    psat = read_psat("rts.m")
+    report = single_simulate(psat, "opf", "seper", clean)
+    print "first result = '" + str(report_in_limits(report)) + "'"
+
+    psat = read_psat("rts2.m")
+    report = single_simulate(psat, "opf", "aggre", clean)
+    print "second result = '" + str(report_in_limits(report)) + "'"
+
+
+# test004()
+
+
+def test005():
+    """simulate an islanded system
+
+       by cutting all the lines across one line it is seperated. But still 
+       passes he simulation. Reoving all the generators hit the multiplier 
+       limit on fix_mismatch.
+
+       A power flow is more likely to fail. Theoretically an OPF could 
+       treat the two islended sections as seperate power systems and
+       optimise each. Unfortunatly PF doesn't yet work!
+    """
+
+    clean_files()
+    clean = False
+
+    data = """
+           [example_4] pf
+             remove line a24
+             remove line a19
+             remove line a18
+             remove line a15
+           """
+
+    scenario = text_to_scenario(data)
+    psat = read_psat("rts.m")
+    report = simulate_scenario(psat, scenario, clean)
+
+    print "result = '" + str(report_in_limits(report)) + "'"
+
+
+# test005()
+
+
+def test006():
+
+    #clean_files()
+
+    def dosim(title, simtype):
+        matlab_filename = "matlab_" + title
+        psat_filename = title + ".m"
+        single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
+        simulate(matlab_filename)
+
+    def cycle(in_filename, out_psat_filename):
+        report = read_report(in_filename + "_01.txt")
+        psat = read_psat(in_filename + ".m")
+        new_psat = report_to_psat(report, psat)
+        with open(out_psat_filename + ".m","w") as new_psat_stream:
+            new_psat.write(new_psat_stream)
+
+    # convert 'rts.m' to form for diff.
+    psat = read_psat("rts.m")
+    with open("psat_min.m","w") as psat_stream:
+        psat.write(psat_stream)
+    dosim("psat_min", "pf")
+
+    # opf 'rts_min.m'
+    cycle("psat_min", "psat_opf")
+    dosim("psat_opf", "opf")
+
+    # pf 'rts_min.m'
+    cycle("psat_min", "psat_pf")
+    dosim("psat_pf", "pf")
+
+
+# test006()
 
 
 # -----------------------------------------------------------------------------

@@ -70,19 +70,6 @@ class PsatReport(object):
             self.pl = pl
             self.ql = ql
 
-    class LineFlow(object):
-        """line flow results
-        """
-
-        def __init__(self, fbus, tbus, line, pf, qf, pl, ql):
-            self.fbus = fbus
-            self.tbus = tbus
-            self.line = line
-            self.pf = pf
-            self.qf = qf
-            self.pl = pl
-            self.ql = ql
-
     def __init__(self):
         self.num_bus = None
         self.num_line = None
@@ -92,7 +79,6 @@ class PsatReport(object):
 
         self.power_rate = None
         self.power_flow = {}
-        self.line_flow = {}
 
         self.acceptable = True
 
@@ -203,18 +189,28 @@ class PsatReport(object):
         
         self.ensure(False, "PowerFlow Limit")
 
+    def process_lineflow_overload(self, _):
+        # print("Limit : %s" % tokens)
+        
+        self.ensure(False, "LineFlow Limit")
+
     def process_lineflow_bus(self, tokens):
+        # Lineflow data isn't actually stored; I don't need it.
+
         # print("Bus Line Flow : %s" % tokens)
         # print tokens["bus1"]
         # print tokens["bus2"]
 
-        pu_check = lambda x: dec_check(x, Decimal("-5.0"), Decimal("5.0"))
-        for x in "pf qf pl ql".split():
-            self.ensure(pu_check(tokens[x]), "error : \n%s" % tokens)
-        self.ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["pf"], Decimal("-10.0"), Decimal("10.0")), 
+                    "lineflow pf error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["qf"], Decimal("-10.0"), Decimal("10.0")), 
+                    "lineflow qf error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["pl"], Decimal("0.0"), Decimal("3.0")), 
+                    "lineflow pl error : \n%s" % tokens)
+        self.ensure(dec_check(tokens["ql"], Decimal("-3.0"), Decimal("3.0")), 
+                    "lineflow ql error : \n%s" % tokens)
 
-        # TODO: I don't actually add anything to self.line_flow
-        # fbus, tbus, line, pf, qf, pl, ql
+        self.ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
 
     def process_summary(self, tokens):
         # print("Summary : %s" % tokens)
@@ -224,20 +220,23 @@ class PsatReport(object):
         ten_neg_check = lambda x: dec_check(x, Decimal("-10.0"), Decimal("10.0"))
 
         for x in range(4):
-            self.ensure(inrange(x), "error : \n%s" % tokens)
+            self.ensure(inrange(x), "summary error : \n%s" % tokens)
 
-        self.ensure(ten_check(tokens[4]), "error : \n%s" % tokens)
-        self.ensure(ten_neg_check(tokens[5]), "error : \n%s" % tokens)
+        self.ensure(ten_check(tokens[4]), "summary error : \n%s" % tokens)
+        self.ensure(ten_neg_check(tokens[5]), "summary error : \n%s" % tokens)
 
     def process_limits(self, tokens):
         # print("Limits : %s" % tokens)
 
-        if any((tok in tokens) for tok in ["reactfail", "voltfail"]):
+        if any((tok in tokens) for tok in ["reactfail", 
+                                           "voltfail",
+                                           "currentfail",
+                                           "reactfail"]):
             self.acceptable = False
 
-    #---------------------------------------------------------------------------
-    #
-    #---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+#
+#---------------------------------------------------------------------------
 
     def GetHeaders(self):
         title = Group(Optional(Literal("OPTIMAL")) + Literal("POWER FLOW REPORT"))
@@ -303,7 +302,16 @@ class PsatReport(object):
         busdef = busdef.setParseAction(self.process_lineflow_bus)
         buses = OneOrMore(busdef)
 
-        lineflow = title + head1 + head2 + buses
+        maxmin = slit("Maximum") | slit("Minimum")
+        afix = maxmin + (slit("apparent power") | slit("current")) 
+        postfix = restOfLine.suppress()
+
+        binding = afix + slit("on line") + postfix
+        overload = afix + slit("limit violation on line") + postfix
+        overload.setParseAction(self.process_lineflow_overload)
+
+        limits = ZeroOrMore(binding | overload)
+        lineflow = title + head1 + head2 + buses + limits
 
         return lineflow + lineflow
 
@@ -337,10 +345,24 @@ class PsatReport(object):
                      integer("reactfail"))
 
         react = reactfail | reactpass
+        
+        currentfail = (slit("# OF CURRENT FLOW LIMIT VIOLATIONS:") +
+                       integer("currentfail"))
 
-        current = slit("ALL CURRENT FLOWS WITHIN LIMITS") + restOfLine.suppress()
+        currentpass = (slit("ALL CURRENT FLOWS WITHIN LIMITS") +
+                       restOfLine.suppress())
+
+        current = currentpass | currentfail
+
         real = slit("ALL REAL POWER FLOWS WITHIN LIMITS") + restOfLine.suppress()
-        apparent = slit("ALL APPARENT POWER FLOWS WITHIN LIMITS") + restOfLine.suppress()
+
+        apparentfail = (slit("# OF APPARENT POWER FLOW LIMIT VIOLATIONS:") +
+                        integer("apparentfail"))
+
+        apparentpass = (slit("ALL APPARENT POWER FLOWS WITHIN LIMITS") +
+                        restOfLine.suppress())
+
+        apparent = apparentpass | apparentfail
 
         limits = title + volt + react + current + real + apparent
         limits.setParseAction(self.process_limits)

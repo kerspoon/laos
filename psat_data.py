@@ -299,9 +299,13 @@ class PsatData(object):
 
         powers = [gen.p for gen in scheduleable_generators]
 
-        limits = []
+        min_limit = []
+        max_limit = []
         for gen in scheduleable_generators:
-            limits.append(sum(supply.p_bid_max for supply in 
+            min_limit.append(sum(supply.p_bid_min for supply in 
+                              self.supply.values() 
+                              if supply.bus_no == gen.bus_no))
+            max_limit.append(sum(supply.p_bid_max for supply in 
                               self.supply.values() 
                               if supply.bus_no == gen.bus_no))
 
@@ -310,7 +314,7 @@ class PsatData(object):
         #     print x,y
         # print "-----"
 
-        res = fix_mismatch(-self.mismatch, powers, limits)
+        res = fix_mismatch(-self.mismatch, powers, min_limit, max_limit)
 
         for newp, generator in zip(res, scheduleable_generators):
             generator.p = newp
@@ -480,6 +484,36 @@ class Test_fix_mismatch(ModifiedTestCase):
         min_list = [-8, -5]
         res = fix_mismatch(3.0, p_list, min_list, max_list)
         self.assertAlmostEqualList(res, [4, 5])
+
+    def test_6(self):
+        p_list = [1, 1]
+        max_list = [2, 2]
+        min_list = [-2, -2]
+
+        res = fix_mismatch(-1.0, p_list, min_list, max_list)
+        self.assertAlmostEqualList(res, [0.5, 0.5])
+
+    def test_7(self):
+        p_list = [1, 0, 1]
+        max_list = [2, 2, 2]
+        min_list = [-2, -2, -2]
+        res = fix_mismatch(-1.0, p_list, min_list, max_list)
+        self.assertAlmostEqualList(res, [0.5, 0, 0.5])
+
+    def test_8(self):
+        p_list = [2, 4]
+        max_list = [8, 8]
+        min_list = [-8, -8]
+        res = fix_mismatch(-3.0, p_list, min_list, max_list)
+        self.assertAlmostEqualList(res, [1, 2])
+
+    def test_9(self):
+        p_list = [2, 4]
+        max_list = [8, 5]
+        min_list = [-1, 3]
+        res = fix_mismatch(-3.0, p_list, min_list, max_list)
+        self.assertAlmostEqualList(res, [0, 3])
+
 
 
 #------------------------------------------------------------------------------

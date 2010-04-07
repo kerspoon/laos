@@ -239,11 +239,13 @@ def batch_simulate(batch, psat, size=10):
         
         # write all the scenarios to file as psat_files
         for scenario in group:
+            scenario.result = None
 
             try:
                 new_psat = scenario_to_psat(scenario, psat)
             except Exception as ex:
-                print "exception in scenario_to_psat", ex
+                print "exception in scenario_to_psat", ex , scenario.title
+                scenario.result = "error"
                 new_psat = deepcopy(psat)
 
             new_psat_filename = "psat_" + scenario.title + ".m"
@@ -255,13 +257,15 @@ def batch_simulate(batch, psat, size=10):
         
         # gather results
         for scenario in group:
-            report_filename = "psat_" + scenario.title + "_01.txt"
-            try:
-                report = read_report(report_filename)
-                scenario.result = report_in_limits(report)
-            except Exception as ex:
-                print "exception in parsing/checking report", ex
-                scenario.result = "error"
+            if not scenario.result:
+                report_filename = "psat_" + scenario.title + "_01.txt"
+                try:
+                    report = read_report(report_filename)
+                    scenario.result = report_in_limits(report)
+                except Exception as ex:
+                    print "exception in parsing/checking report", ex
+                    scenario.result = "error"
+                
 
         timer_end = time.clock()
         timer_time = (timer_end-timer_start)

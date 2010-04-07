@@ -170,7 +170,7 @@ def report_to_psat(report, psat):
         gen.p = pf[gen.bus_no].pg
         gen.v = pf[gen.bus_no].v
 
-    for load in new_psat.loads:
+    for load in new_psat.loads.values():
         assert pf[load.bus_no] != None
         load.p = pf[load.bus_no].pl
         load.q = pf[load.bus_no].ql
@@ -593,15 +593,16 @@ def test003():
 
     report = read_report("rts_01.txt")
     psat = read_psat("rts.m")
+
     new_psat = report_to_psat(report, psat)
 
-    with open("rts003.m","w") as new_psat_stream:
+    with open("test_d.m","w") as new_psat_stream:
         new_psat.write(new_psat_stream)
 
-    helper("rts003")
+    helper("test_d")
 
 
-test003()
+# test003()
 
 
 def test004():
@@ -622,6 +623,74 @@ def test004():
 
 
 # test004()
+
+
+def test005():
+    """simulate an islanded system
+
+       by cutting all the lines across one line it is seperated. But still 
+       passes he simulation. Reoving all the generators hit the multiplier 
+       limit on fix_mismatch.
+
+       A power flow is more likely to fail. Theoretically an OPF could 
+       treat the two islended sections as seperate power systems and
+       optimise each. Unfortunatly PF doesn't yet work!
+    """
+
+    clean_files()
+    clean = False
+
+    data = """
+           [example_4] pf
+             remove line a24
+             remove line a19
+             remove line a18
+             remove line a15
+           """
+
+    scenario = text_to_scenario(data)
+    psat = read_psat("rts.m")
+    report = simulate_scenario(psat, scenario, clean)
+
+    print "result = '" + str(report_in_limits(report)) + "'"
+
+
+# test005()
+
+
+def test006():
+
+    #clean_files()
+
+    def dosim(title, simtype):
+        matlab_filename = "matlab_" + title
+        psat_filename = title + ".m"
+        single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
+        simulate(matlab_filename)
+
+    def cycle(in_filename, out_psat_filename):
+        report = read_report(in_filename + "_01.txt")
+        psat = read_psat(in_filename + ".m")
+        new_psat = report_to_psat(report, psat)
+        with open(out_psat_filename + ".m","w") as new_psat_stream:
+            new_psat.write(new_psat_stream)
+
+    # convert 'rts.m' to form for diff.
+    psat = read_psat("rts.m")
+    with open("psat_min.m","w") as psat_stream:
+        psat.write(psat_stream)
+    dosim("psat_min", "pf")
+
+    # opf 'rts_min.m'
+    cycle("psat_min", "psat_opf")
+    dosim("psat_opf", "opf")
+
+    # pf 'rts_min.m'
+    cycle("psat_min", "psat_pf")
+    dosim("psat_pf", "pf")
+
+
+# test006()
 
 
 # -----------------------------------------------------------------------------

@@ -261,7 +261,9 @@ class PsatData(object):
            But where there was only one gen on a bus anyway it 
            doesn't have a virtual bus hence might have a load.
         """
+
         bus_no = self.supply[supply_id].bus_no
+        assert bus_no in self.generators, "missing generator info, slack?"
         self.mismatch -= self.generators[bus_no].p 
         del self.generators[bus_no]
         del self.supply[supply_id]
@@ -354,69 +356,86 @@ class PsatData(object):
 #------------------------------------------------------------------------------
 
 
-def fix_mismatch(mismatch, gen_power, gen_limit):
+def fix_mismatch(mismatch, power, min_limit, max_limit):
     """
-    func fix_mismatch :: Real, [Real], [Real] -> [Real]
+    func fix_mismatch :: Real, [Real], [Real], [Real] -> [Real]
     
     change the total generated power by `mismatch`.
     Do this based upon current power of each generator
     taking into account its limits.
     Returns a list of new generator powers
-
     """
 
-    assert(len(gen_power) == len(gen_limit))
+    assert(len(power) == len(min_limit) == len(max_limit))
 
     if mismatch == 0:
-        return gen_power
-
-    done = [False for _ in range(len(gen_power))]
-    result = [0.0 for _ in range(len(gen_power))]
-
-    def find_limit(m):
+        return power
+    
+    done = [False for _ in range(len(power))]
+    result = [0.0 for _ in range(len(power))]
+     
+    def find_limit_max(m):
         """find the index of the first generator that will
-           be limited. or None """
-        for n,(gp,gr) in enumerate(zip(gen_power,gen_limit)):
-            if (not done[n]) and (gp * m > gr):
-                    return n
+        be limited. or None """
+        for n in range(len(done)):
+            if (not done[n]) and (power[n] * m > max_limit[n]):
+                return n
         return None
-  
+     
+    def find_limit_min(m):
+        """find the index of the first generator that will
+        be limited. or None """
+        for n in range(len(done)):
+            if (not done[n]) and (power[n] * m < min_limit[n]):
+                return n
+        return None
+
     # deal with each generator that will be limited
     while True:
         assert(not all(done))
-  
-        total_gen = sum(gen_power[i] for i in range(len(done)) if not done[i])
+
+        total_gen = sum(power[i] for i in range(len(done)) if not done[i])
         assert(total_gen != 0)
-  
+        
         multiplier = 1.0 + (mismatch / total_gen)
         assert(0 <= multiplier <= 2)
-        # print "multiplier", multiplier
-  
-        idx_gen = find_limit(multiplier)
-        if idx_gen is None:
-            break
-  
-        # print "generator hit limit:", idx_gen
-        result[idx_gen] = gen_limit[idx_gen]
-        mismatch -= result[idx_gen] - gen_power[idx_gen]
-        done[idx_gen] = True
-  
+
+        if mismatch < 0:
+            idx_gen = find_limit_min(multiplier)
+            if idx_gen is None:
+                break
+
+            # print "generator hit min limit:", idx_gen
+            result[idx_gen] = min_limit[idx_gen]
+            mismatch -= result[idx_gen] - power[idx_gen]
+            done[idx_gen] = True
+        else:
+            idx_gen = find_limit_max(multiplier)
+            if idx_gen is None:
+                break
+
+            # print "generator hit max limit:", idx_gen
+            result[idx_gen] = max_limit[idx_gen]
+            mismatch -= result[idx_gen] - power[idx_gen]
+            done[idx_gen] = True
+
     # deal with all the other generators 
     # knowing that none of them will limit
-    for idx in range(len(gen_power)):
+    for idx in range(len(power)):
         if not done[idx]:
             # print "set generator", idx
-            result[idx] = gen_power[idx] * multiplier
-            mismatch -= result[idx] - gen_power[idx]
+            result[idx] = power[idx] * multiplier
+            mismatch -= result[idx] - power[idx]
             done[idx] = True
   
     # check nothing is out of limits 
-    for idx in range(len(gen_power)):
-        assert(gen_power[idx] <= gen_limit[idx])
+    for idx in range(len(power)):
+        assert(min_limit[idx] <= power[idx] <= max_limit[idx])
     assert mismatch < 0.001
     assert all(done)
     
     return result
+
 
 #------------------------------------------------------------------------------
 #
@@ -427,33 +446,39 @@ class Test_fix_mismatch(ModifiedTestCase):
 
     def test_1(self):
         p_list = [1, 1, 1, 1, 1]
-        r_list = [2, 2, 2, 2, 2]
+        max_list = [2, 2, 2, 2, 2]
+        min_list = [-2, -2, -2, -2, -2]
 
-        res = fix_mismatch(0, p_list, r_list)
+        res = fix_mismatch(0, p_list, min_list, max_list)
         self.assertAlmostEqualList(res, p_list)
       
     def test_2(self):
         p_list = [1, 1]
-        r_list = [2, 2]
-        res = fix_mismatch(1.0, p_list, r_list)
+        max_list = [2, 2]
+        min_list = [-2, -2]
+
+        res = fix_mismatch(1.0, p_list, min_list, max_list)
         self.assertAlmostEqualList(res, [1.5, 1.5])
 
     def test_3(self):
         p_list = [1, 0, 1]
-        r_list = [2, 2, 2]
-        res = fix_mismatch(1.0, p_list, r_list)
+        max_list = [2, 2, 2]
+        min_list = [-2, -2, -2]
+        res = fix_mismatch(1.0, p_list, min_list, max_list)
         self.assertAlmostEqualList(res, [1.5, 0, 1.5])
 
     def test_4(self):
         p_list = [2, 4]
-        r_list = [8, 8]
-        res = fix_mismatch(3.0, p_list, r_list)
+        max_list = [8, 8]
+        min_list = [-8, -8]
+        res = fix_mismatch(3.0, p_list, min_list, max_list)
         self.assertAlmostEqualList(res, [3, 6])
 
     def test_5(self):
         p_list = [2, 4]
-        r_list = [8, 5]
-        res = fix_mismatch(3.0, p_list, r_list)
+        max_list = [8, 5]
+        min_list = [-8, -5]
+        res = fix_mismatch(3.0, p_list, min_list, max_list)
         self.assertAlmostEqualList(res, [4, 5])
 
 

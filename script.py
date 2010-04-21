@@ -161,19 +161,19 @@ def report_to_psat(report, psat):
     pf = report.power_flow
 
     slack = new_psat.slack.values()[0]
-    slack.v_magnitude = pf[slack.bus_no].v
-    slack.ref_angle = pf[slack.bus_no].phase
-    # slack.p_guess = pf[slack.bus_no].pg
+    slack.v_magnitude = float(pf[slack.bus_no].v)
+    slack.ref_angle = float(pf[slack.bus_no].phase)
+    # slack.p_guess = float(pf[slack.bus_no].pg)
 
     for gen in new_psat.generators.values():
         assert pf[gen.bus_no] != None
-        gen.p = pf[gen.bus_no].pg
-        gen.v = pf[gen.bus_no].v
+        gen.p = float(pf[gen.bus_no].pg)
+        gen.v = float(pf[gen.bus_no].v)
 
     for load in new_psat.loads.values():
         assert pf[load.bus_no] != None
-        load.p = pf[load.bus_no].pl
-        load.q = pf[load.bus_no].ql
+        load.p = float(pf[load.bus_no].pl)
+        load.q = float(pf[load.bus_no].ql)
 
     assert(new_psat.in_limits())
 
@@ -468,7 +468,7 @@ def example4():
     clean = False
 
     data = """
-           [example_4] pf
+           [example_4] opf
            """
 
     scenario = text_to_scenario(data)
@@ -660,7 +660,7 @@ def test005():
 
 def test006():
 
-    #clean_files()
+    clean_files()
 
     def dosim(title, simtype):
         matlab_filename = "matlab_" + title
@@ -677,20 +677,15 @@ def test006():
 
     # convert 'rts.m' to form for diff.
     psat = read_psat("rts.m")
-    with open("psat_min.m","w") as psat_stream:
+    with open("psat_opf.m","w") as psat_stream:
         psat.write(psat_stream)
-    dosim("psat_min", "pf")
 
-    # opf 'rts_min.m'
-    cycle("psat_min", "psat_opf")
+    # 
     dosim("psat_opf", "opf")
-
-    # pf 'rts_min.m'
-    cycle("psat_min", "psat_pf")
-    dosim("psat_pf", "pf")
+    cycle("psat_opf", "psat_res")
 
 
-# test006()
+test006()
 
 
 # -----------------------------------------------------------------------------

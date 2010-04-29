@@ -469,6 +469,8 @@ def example4():
 
     data = """
            [example_4] opf
+             remove generator g9
+             set all demand 0.88
            """
 
     scenario = text_to_scenario(data)
@@ -478,7 +480,7 @@ def example4():
     print "result = '" + str(report_in_limits(report)) + "'"
 
 
-# example4()
+example4()
 
 
 def example5():
@@ -675,17 +677,32 @@ def test006():
         with open(out_psat_filename + ".m","w") as new_psat_stream:
             new_psat.write(new_psat_stream)
 
+    def kill_shunt(in_filename, out_filename):
+        psat = read_psat(in_filename + ".m")
+        psat.shunts = {}
+        with open(out_filename + ".m","w") as psat_stream:
+            psat.write(psat_stream)
+
     # convert 'rts.m' to form for diff.
     psat = read_psat("rts.m")
-    with open("psat_opf.m","w") as psat_stream:
+    with open("psat_base.m","w") as psat_stream:
         psat.write(psat_stream)
 
-    # 
-    dosim("psat_opf", "opf")
-    cycle("psat_opf", "psat_res")
+    def inner_test1():
+        """without the shunt they should match"""
+        kill_shunt("psat_base","psat_a")
+        dosim("psat_a", "opf")
+        cycle("psat_a", "psat_b")
+        dosim("psat_b", "pf")
+        cycle("psat_b", "psat_c")
+        dosim("psat_c", "pf")
+    inner_test1()
 
+    # TODO:: need to think about this better
+    # opf then kill sunt then opf and the results of the 
+    # two opf should match??? maybe?
 
-test006()
+# test006()
 
 
 # -----------------------------------------------------------------------------

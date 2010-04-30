@@ -480,7 +480,7 @@ def example4():
     print "result = '" + str(report_in_limits(report)) + "'"
 
 
-example4()
+# example4()
 
 
 def example5():
@@ -619,7 +619,7 @@ def test004():
     report = single_simulate(psat, "opf", "seper", clean)
     print "first result = '" + str(report_in_limits(report)) + "'"
 
-    psat = read_psat("rts2.m")
+    psat = read_psat("rts2000.m")
     report = single_simulate(psat, "opf", "aggre", clean)
     print "second result = '" + str(report_in_limits(report)) + "'"
 
@@ -677,32 +677,70 @@ def test006():
         with open(out_psat_filename + ".m","w") as new_psat_stream:
             new_psat.write(new_psat_stream)
 
-    def kill_shunt(in_filename, out_filename):
+    def copy_kill_shunt(in_filename, out_filename):
         psat = read_psat(in_filename + ".m")
         psat.shunts = {}
         with open(out_filename + ".m","w") as psat_stream:
             psat.write(psat_stream)
 
+    def cycle_kill_shunt(in_filename, out_psat_filename):
+        report = read_report(in_filename + "_01.txt")
+        psat = read_psat(in_filename + ".m")
+        new_psat = report_to_psat(report, psat)
+        new_psat.shunts = {}
+        with open(out_psat_filename + ".m","w") as new_psat_stream:
+            new_psat.write(new_psat_stream)
+
+    def copy_psat(in_filename, out_filename):
+        psat = read_psat(in_filename + ".m")
+        with open(out_filename + ".m","w") as psat_stream:
+            psat.write(psat_stream)
+
     # convert 'rts.m' to form for diff.
-    psat = read_psat("rts.m")
-    with open("psat_base.m","w") as psat_stream:
-        psat.write(psat_stream)
+    copy_psat("rts", "psat_base")
 
     def inner_test1():
         """without the shunt they should match"""
-        kill_shunt("psat_base","psat_a")
+        copy_kill_shunt("psat_base","psat_a")
         dosim("psat_a", "opf")
         cycle("psat_a", "psat_b")
         dosim("psat_b", "pf")
         cycle("psat_b", "psat_c")
         dosim("psat_c", "pf")
-    inner_test1()
+    # inner_test1()
+
+    def inner_test2():
+        copy_psat("psat_base", "psat_a")
+        dosim("psat_a", "pf")
+
+        copy_psat("psat_base", "psat_b")
+        dosim("psat_b", "opf")
+
+        copy_kill_shunt("psat_base","psat_c")
+        dosim("psat_c", "pf")
+
+        copy_kill_shunt("psat_base","psat_d")
+        dosim("psat_d", "opf")
+
+        cycle("psat_a", "psat_aa")
+        dosim("psat_aa", "pf")
+
+        cycle("psat_a", "psat_ab")
+        dosim("psat_ab", "opf")
+
+        cycle_kill_shunt("psat_a", "psat_ac")
+        dosim("psat_ac", "pf")
+
+        cycle_kill_shunt("psat_a", "psat_ad")
+        dosim("psat_ad", "opf")
+
+    inner_test2()
 
     # TODO:: need to think about this better
-    # opf then kill sunt then opf and the results of the 
+    # opf then kill shunt then opf and the results of the 
     # two opf should match??? maybe?
 
-# test006()
+test006()
 
 
 # -----------------------------------------------------------------------------

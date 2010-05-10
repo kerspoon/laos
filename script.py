@@ -425,14 +425,14 @@ def example1(n = 100):
 
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
-    batch = make_outages(prob, n)
+    batch = make_failures(prob, n)
 
     batch_simulate(batch, psat, 30)
 
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
-# example1()
+example1()
 
 
 def example2(report_filename = "tmp.txt"):
@@ -800,7 +800,7 @@ def test007():
     copy_mod_shunt("rts", "psat_20", -0.4)
     dosim("psat_20", "pf")
 
-test007()
+# test007()
 
 # -----------------------------------------------------------------------------
 

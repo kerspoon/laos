@@ -253,7 +253,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
                 new_psat.write(new_psat_file)
         
         # run matlab 
-        res = simulate(matlab_filename)
+        res = simulate(matlab_filename, False)
         assert len(res) == len(group)
         for r,scenario in zip(res,group):
             if not(r):
@@ -369,7 +369,7 @@ def batch_matlab_script(filename, batch):
         matlab_stream.write("Settings.lfmit = 50;\n")
         matlab_stream.write("Settings.violations = 'on'\n")
         matlab_stream.write("OPF.basepg = 0;\n")
-        # matlab_stream.write("OPF.basepl = 0;\n")
+        matlab_stream.write("OPF.basepl = 0;\n")
 
         simtype = batch[0].simtype
 
@@ -392,7 +392,7 @@ def batch_matlab_script(filename, batch):
         matlab_stream.write("exit\n")
 
 
-def simulate(matlab_filename):
+def simulate(matlab_filename, single_item=True):
     """func simulate             :: Str -> Bool
        ----
        call matlab with the specified script.
@@ -412,19 +412,50 @@ def simulate(matlab_filename):
 
         so, se = proc.communicate()
      
+        print "SE"
+        print "================================="
+        print se 
+        print "================================="
+        print "SO"
+        print "================================="
+        print so 
+        print "================================="
+
         assert se == "", "sim-error: " + se
 
-        result = [x.startswith(" completed in") for x in so.split("IPM-OPF")][1:]
-        assert len(result) >= 1
 
-        # print "SE"
-        # print "================================="
-        # print se 
-        # print "================================="
-        # print "SO"
-        # print "================================="
-        # print so 
-        # print "================================="
+        def grab_next(start):
+            start = so.find("Power Flow Computation", start) + 1 
+
+            idx = so.find("Power Flow", start)
+
+            if not(so[idx:].startswith("Power Flow completed in")):
+                print "grab_next error:", so[idx:idx+30]
+                return False, idx+1
+        
+            if so.find("IPM-OPF", idx) != -1:
+                idx2 = so.find("IPM-OPF", idx)
+                if so[idx:].startswith("IPM-OPF completed in"):
+                    print "grab_next error:", so[idx2:idx2+30]
+                    return False, idx2+1
+            
+            return True, idx+1
+
+        index = 0
+        result = []
+        while(so.find("Power Flow", index) != -1):
+            curr_res, curr_idx = grab_next(index)
+            # print "we are here --->", so[curr_idx:curr_idx+30]
+            result.append(curr_res)
+            index = curr_idx
+
+        assert len(result) >= 1, str(result)
+
+        if single_item:
+            print result
+            assert len(result) == 1
+            if not(result):
+                print "did not converge (in simulate)"
 
         return result
 
@@ -712,7 +743,13 @@ def test006():
         report = read_report(in_filename + "_01.txt")
         psat = read_psat(in_filename + ".m")
         new_psat = report_to_psat(report, psat)
-        psat.shunts[6].b = new_shunt_vau
+        new_psat.shunts = {}
+        new_psat.generators[39].v = "1.01401"
+        new_psat.generators[40].v = "1.01401"
+        new_psat.generators[41].v = "1.01401"
+        new_psat.generators[42].v = "1.01401"
+        new_psat.generators[43].v = "1.01401"
+
         with open(out_psat_filename + ".m","w") as new_psat_stream:
             new_psat.write(new_psat_stream)
 
@@ -725,41 +762,18 @@ def test006():
     copy_psat("rts", "psat_base")
 
     def inner_test1():
-        """without the shunt they should match"""
-        copy_kill_shunt("psat_base","psat_a")
+        copy_psat("psat_base", "psat_a")
         dosim("psat_a", "opf")
         cycle("psat_a", "psat_b")
-        dosim("psat_b", "pf")
-        cycle("psat_b", "psat_c")
-        dosim("psat_c", "pf")
+        dosim("psat_b", "opf")
     # inner_test1()
 
     def inner_test2():
         copy_psat("psat_base", "psat_a")
-        dosim("psat_a", "pf")
-
-        copy_psat("psat_base", "psat_b")
-        dosim("psat_b", "opf")
-
-        copy_kill_shunt("psat_base","psat_c")
-        dosim("psat_c", "pf")
-
-        copy_kill_shunt("psat_base","psat_d")
-        dosim("psat_d", "opf")
-
-        cycle("psat_a", "psat_aa")
-        dosim("psat_aa", "pf")
-
-        cycle("psat_a", "psat_ab")
-        dosim("psat_ab", "opf")
-
-        cycle_kill_shunt("psat_a", "psat_ac")
-        dosim("psat_ac", "pf")
-
-        cycle_kill_shunt("psat_a", "psat_ad")
-        dosim("psat_ad", "opf")
-
-    # inner_test2()
+        dosim("psat_a", "opf")
+        cycle("psat_a", "psat_b")
+        dosim("psat_b", "pf")
+    inner_test2()
 
     def inner_test3():
         copy_kill_shunt("psat_base","psat_c")
@@ -772,14 +786,8 @@ def test006():
         dosim("psat_ccc", "pf")
     # inner_test3()
 
-    copy_psat("psat_base", "psat_a")
-    dosim("psat_a", "pf")
-
-    # TODO:: need to think about this better
-    # opf then kill shunt then opf and the results of the 
-    # two opf should match??? maybe?
-
 # test006()
+
 
 def test007():
     
@@ -817,7 +825,7 @@ def test007():
     copy_mod_shunt("rts", "psat_20", -0.4)
     dosim("psat_20", "pf")
 
-# test007()
+#test007()
 
 def test008():
     
@@ -859,9 +867,6 @@ def test008():
 
 # test008()
 
-
-
-    
 
     
 

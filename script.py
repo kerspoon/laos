@@ -766,14 +766,18 @@ def test006():
         dosim("psat_a", "opf")
         cycle("psat_a", "psat_b")
         dosim("psat_b", "opf")
+        cycle("psat_b", "psat_c")
+        dosim("psat_c", "opf")
+
     # inner_test1()
 
     def inner_test2():
-        copy_psat("psat_base", "psat_a")
-        dosim("psat_a", "opf")
-        cycle("psat_a", "psat_b")
-        dosim("psat_b", "pf")
-    inner_test2()
+        copy_psat("psat_base", "psat_0")
+        for i in range(100):
+            dosim("psat_" + str(i), "pf")
+            cycle("psat_" + str(i), "psat_" + str(i+1))
+
+    #inner_test2()
 
     def inner_test3():
         copy_kill_shunt("psat_base","psat_c")
@@ -786,7 +790,23 @@ def test006():
         dosim("psat_ccc", "pf")
     # inner_test3()
 
-# test006()
+    def inner_test4():
+        copy_psat("psat_base", "psat_a")
+        dosim("psat_a", "opf")
+        cycle("psat_a", "psat_b")
+        dosim("psat_b", "pf")
+    # inner_test4()
+
+    def inner_test5():
+        copy_psat("psat_base", "psat_a")
+        dosim("psat_a", "opf")
+        cycle_kill_shunt("psat_a", "psat_b")
+        dosim("psat_b", "pf")
+        cycle("psat_b", "psat_c")
+        dosim("psat_c", "pf")
+    inner_test5()
+
+test006()
 
 
 def test007():

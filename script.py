@@ -217,7 +217,7 @@ def scenario_to_psat(scenario, psat):
     return new_psat
 
 
-def batch_simulate(batch, psat, size=10):
+def batch_simulate(batch, psat, size=10, clean=True):
     """func batch_simulate       :: SimulationBatch, PsatData, Int -> 
        ----
        Simulate all Scenarios in `batch` (with a base of `psat`) in groups
@@ -270,7 +270,9 @@ def batch_simulate(batch, psat, size=10):
         timer_end = time.clock()
         timer_time = (timer_end-timer_start)
         print "batch time of", int(math.ceil(timer_time)), "seconds"
-    clean_files()
+
+    if clean:
+        clean_files()
 
 
 def single_simulate(psat, simtype, title, clean=True):
@@ -353,6 +355,7 @@ def batch_matlab_script(filename, batch):
            "psat_" + scenario.title + ".m"
     """
 
+
     assert len(batch) != 0
     with open(filename, "w") as matlab_stream:
 
@@ -360,14 +363,19 @@ def batch_matlab_script(filename, batch):
         matlab_stream.write("Settings.lfmit = 50;\n")
         matlab_stream.write("Settings.violations = 'on'\n")
         matlab_stream.write("OPF.basepg = 0;\n")
+        matlab_stream.write("OPF.basepl = 0;\n")
+
+        simtype = batch[0].simtype
 
         for scenario in batch:
             filename = "psat_" + scenario.title + ".m"
             matlab_stream.write("runpsat('" + filename + "','data');\n")
 
-            if scenario.simtype == "pf":
+            assert simtype == scenario.simtype
+
+            if simtype == "pf":
                 matlab_stream.write("runpsat pf;\n")
-            elif scenario.simtype == "opf":
+            elif simtype == "opf":
                 matlab_stream.write("runpsat pf;\n")
                 matlab_stream.write("runpsat opf;\n")
             else:
@@ -432,7 +440,7 @@ def example1(n = 100):
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
-example1()
+# example1()
 
 
 def example2(report_filename = "tmp.txt"):
@@ -801,6 +809,53 @@ def test007():
     dosim("psat_20", "pf")
 
 # test007()
+
+def test008():
+    
+    clean_files()
+
+    psat = read_psat("rts.m")
+    # prob = read_probabilities("rts.net")
+    # batch = make_outages(prob, 2)
+
+
+    data = """
+[outage0] opf
+  remove generator g1
+  remove generator g4
+  remove generator g31
+  set all demand 0.3987456
+  result pass
+[outage1] opf
+  remove generator g22
+  remove generator g24
+  set all demand 0.6670332
+  result fail
+           """
+
+    batch = SimulationBatch()
+    batch.read(StringIO(data))
+
+    batch_simulate(batch, psat, 10, False)
+
+    with open("rts.bch", "w") as result_file:
+        batch.write(result_file)
+
+    for n,scenario in enumerate(batch):
+        scenario.title = "single" + str(n)
+        report = simulate_scenario(psat, scenario, False) 
+        scenario.result = report_in_limits(report)
+      
+    with open("rts2.bch", "w") as result_file:
+        batch.write(result_file)
+
+test008()
+
+
+
+    
+
+    
 
 # -----------------------------------------------------------------------------
 

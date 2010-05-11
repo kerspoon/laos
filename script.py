@@ -224,8 +224,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
        of size `size`. Modify `batch` in place. delete all temp files
        if it succedes 
 
-       Note:: We need to say the scenario is a failure if it 
-              fails scenario_to_psat.
+       Todo:: simulate can throw so we want each batch in a try/except block
     """
 
     for n, group in enumerate(split_every(size, batch)):
@@ -244,7 +243,8 @@ def batch_simulate(batch, psat, size=10, clean=True):
             try:
                 new_psat = scenario_to_psat(scenario, psat)
             except Exception as ex:
-                print "exception in scenario_to_psat", ex , scenario.title
+                print "exception in scenario_to_psat", 
+                print scenario.title, ex
                 scenario.result = "error"
                 new_psat = deepcopy(psat)
 
@@ -253,7 +253,12 @@ def batch_simulate(batch, psat, size=10, clean=True):
                 new_psat.write(new_psat_file)
         
         # run matlab 
-        simulate(matlab_filename)
+        res = simulate(matlab_filename)
+        assert len(res) == len(group)
+        for r,scenario in zip(res,group):
+            if not(r):
+                print "did not converge", scenario.title
+                scenario.result = "fail"
         
         # gather results
         for scenario in group:
@@ -263,7 +268,8 @@ def batch_simulate(batch, psat, size=10, clean=True):
                     report = read_report(report_filename)
                     scenario.result = report_in_limits(report)
                 except Exception as ex:
-                    print "exception in parsing/checking report", ex
+                    print "exception in parsing/checking report", 
+                    print scenario.title, ex
                     scenario.result = "error"
                 
 
@@ -363,7 +369,7 @@ def batch_matlab_script(filename, batch):
         matlab_stream.write("Settings.lfmit = 50;\n")
         matlab_stream.write("Settings.violations = 'on'\n")
         matlab_stream.write("OPF.basepg = 0;\n")
-        matlab_stream.write("OPF.basepl = 0;\n")
+        # matlab_stream.write("OPF.basepl = 0;\n")
 
         simtype = batch[0].simtype
 
@@ -408,6 +414,9 @@ def simulate(matlab_filename):
      
         assert se == "", "sim-error: " + se
 
+        result = [x.startswith(" completed in") for x in so.split("IPM-OPF")][1:]
+        assert len(result) >= 1
+
         # print "SE"
         # print "================================="
         # print se 
@@ -417,7 +426,7 @@ def simulate(matlab_filename):
         # print so 
         # print "================================="
 
-        return True
+        return result
 
     except:
         print "simulate failed"
@@ -818,15 +827,14 @@ def test008():
     # prob = read_probabilities("rts.net")
     # batch = make_outages(prob, 2)
 
-
     data = """
-[outage0] opf
+[batch0] opf
   remove generator g1
   remove generator g4
   remove generator g31
   set all demand 0.3987456
   result pass
-[outage1] opf
+[batch1] opf
   remove generator g22
   remove generator g24
   set all demand 0.6670332
@@ -845,11 +853,11 @@ def test008():
         scenario.title = "single" + str(n)
         report = simulate_scenario(psat, scenario, False) 
         scenario.result = report_in_limits(report)
-      
+    
     with open("rts2.bch", "w") as result_file:
         batch.write(result_file)
 
-test008()
+# test008()
 
 
 

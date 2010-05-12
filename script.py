@@ -175,7 +175,17 @@ def report_to_psat(report, psat):
         load.p = float(pf[load.bus_no].pl)
         load.q = float(pf[load.bus_no].ql)
 
-    assert(new_psat.in_limits())
+    assert len(psat.shunts) == 0
+
+    # fix for reactive power on bus 39-43
+    new_psat.generators[39].v = "1.01401"
+    new_psat.generators[40].v = "1.01401"
+    new_psat.generators[41].v = "1.01401"
+    new_psat.generators[42].v = "1.01401"
+    new_psat.generators[43].v = "1.01401"
+
+    assert new_psat.loads[6].q == "1.299"
+    assert new_psat.in_limits()
 
     return new_psat
 
@@ -708,8 +718,7 @@ def test005():
 
 
 def test006():
-
-    new_shunt_vau = "0.0"
+    """playing with shunt"""
 
     clean_files()
 
@@ -733,26 +742,6 @@ def test006():
         with open(out_psat_filename + ".m","w") as new_psat_stream:
             new_psat.write(new_psat_stream)
 
-    def copy_kill_shunt(in_filename, out_filename):
-        psat = read_psat(in_filename + ".m")
-        psat.shunts[6].b = new_shunt_vau
-        with open(out_filename + ".m","w") as psat_stream:
-            psat.write(psat_stream)
-
-    def cycle_kill_shunt(in_filename, out_psat_filename):
-        report = read_report(in_filename + "_01.txt")
-        psat = read_psat(in_filename + ".m")
-        new_psat = report_to_psat(report, psat)
-        new_psat.shunts = {}
-        new_psat.generators[39].v = "1.01401"
-        new_psat.generators[40].v = "1.01401"
-        new_psat.generators[41].v = "1.01401"
-        new_psat.generators[42].v = "1.01401"
-        new_psat.generators[43].v = "1.01401"
-
-        with open(out_psat_filename + ".m","w") as new_psat_stream:
-            new_psat.write(new_psat_stream)
-
     def copy_kill_shunt_mod(in_filename, out_psat_filename):
         psat = read_psat(in_filename + ".m")
         psat.shunts = {}
@@ -766,7 +755,6 @@ def test006():
         with open(out_psat_filename + ".m","w") as new_psat_stream:
             psat.write(new_psat_stream)
 
-
     def copy_psat(in_filename, out_filename):
         psat = read_psat(in_filename + ".m")
         with open(out_filename + ".m","w") as psat_stream:
@@ -775,104 +763,32 @@ def test006():
     # convert 'rts.m' to form for diff.
     copy_psat("rts", "psat_base")
 
-    def inner_test1():
-        copy_psat("psat_base", "psat_a")
-        dosim("psat_a", "opf")
-        cycle("psat_a", "psat_b")
-        dosim("psat_b", "opf")
-        cycle("psat_b", "psat_c")
-        dosim("psat_c", "opf")
-
-    # inner_test1()
-
-    def inner_test2():
-        copy_psat("psat_base", "psat_0")
-        for i in range(100):
-            dosim("psat_" + str(i), "pf")
-            cycle("psat_" + str(i), "psat_" + str(i+1))
-
-    #inner_test2()
-
-    def inner_test3():
-        dosim("psat_base", "pf")
-
-        copy_kill_shunt("psat_base","psat_c")
-        dosim("psat_c", "pf")
-
-        cycle("psat_c", "psat_cc")
-        dosim("psat_cc", "pf")
-
-        cycle("psat_cc", "psat_ccc")
-        dosim("psat_ccc", "pf")
-    # inner_test3()
-
-    def inner_test4():
-        copy_psat("psat_base", "psat_a")
-        dosim("psat_a", "opf")
-        cycle("psat_a", "psat_b")
-        dosim("psat_b", "pf")
-    # inner_test4()
-
-    def inner_test5():
-        copy_psat("psat_base", "psat_a")
-        dosim("psat_a", "opf")
-        cycle_kill_shunt("psat_a", "psat_b")
-        dosim("psat_b", "pf")
-        cycle("psat_b", "psat_c")
-        dosim("psat_c", "pf")
-    # inner_test5()
-
     def inner_test6():
+        """we can remove the effect of the shunt by
+           changing the load Q value and removing the shunt"""
+        simtype = "opf"
         copy_kill_shunt_mod("psat_base", "psat_a")
-        dosim("psat_a", "pf")
+        dosim("psat_a", simtype)
         cycle("psat_a", "psat_b")
-        dosim("psat_b", "pf")
+        dosim("psat_b", simtype)
         cycle("psat_b", "psat_c")
-        dosim("psat_c", "pf")
-    inner_test6()
-        
+        dosim("psat_c", simtype)
+    # inner_test6()
+
+    def inner_test7():
+        """after taking out the shunt we should have a stable solution
+           with either pf or opf."""
+        simtype = "opf"
+        copy_kill_shunt_mod("psat_base", "psat_a")
+        dosim("psat_a", simtype)
+        copy_psat("psat_base", "psat_b")
+        dosim("psat_b", simtype)
+    # inner_test7()
+
 test006()
 
-
 def test007():
-    
-    clean_files()
-
-    def copy_psat(in_filename, out_filename):
-        psat = read_psat(in_filename + ".m")
-        with open(out_filename + ".m","w") as psat_stream:
-            psat.write(psat_stream)
-
-    def dosim(title, simtype):
-        matlab_filename = "matlab_" + title
-        psat_filename = title + ".m"
-        single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
-        simulate(matlab_filename)
-
-    def copy_mod_shunt(in_filename, out_filename, newval):
-        psat = read_psat(in_filename + ".m")
-        psat.shunts[6].b = newval
-        with open(out_filename + ".m","w") as psat_stream:
-            psat.write(psat_stream)
-
-    copy_psat("rts", "psat_base")
-    dosim("psat_base", "pf")
-
-    copy_mod_shunt("rts", "psat_00", 0)
-    dosim("psat_00", "pf")
-
-    copy_mod_shunt("rts", "psat_05", -0.5)
-    dosim("psat_05", "pf")
-
-    copy_mod_shunt("rts", "psat_10", -1)
-    dosim("psat_10", "pf")
-
-    copy_mod_shunt("rts", "psat_20", -0.4)
-    dosim("psat_20", "pf")
-
-#test007()
-
-def test008():
+    """batch and single should gave same results"""
     
     clean_files()
 
@@ -910,7 +826,7 @@ def test008():
     with open("rts2.bch", "w") as result_file:
         batch.write(result_file)
 
-# test008()
+# test007()
 
 
     

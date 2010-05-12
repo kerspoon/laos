@@ -412,14 +412,14 @@ def simulate(matlab_filename, single_item=True):
 
         so, se = proc.communicate()
      
-        print "SE"
-        print "================================="
-        print se 
-        print "================================="
-        print "SO"
-        print "================================="
-        print so 
-        print "================================="
+        # print "SE"
+        # print "================================="
+        # print se 
+        # print "================================="
+        # print "SO"
+        # print "================================="
+        # print so 
+        # print "================================="
 
         assert se == "", "sim-error: " + se
 
@@ -753,6 +753,20 @@ def test006():
         with open(out_psat_filename + ".m","w") as new_psat_stream:
             new_psat.write(new_psat_stream)
 
+    def copy_kill_shunt_mod(in_filename, out_psat_filename):
+        psat = read_psat(in_filename + ".m")
+        psat.shunts = {}
+        psat.generators[39].v = "1.01401"
+        psat.generators[40].v = "1.01401"
+        psat.generators[41].v = "1.01401"
+        psat.generators[42].v = "1.01401"
+        psat.generators[43].v = "1.01401"
+        psat.loads[6].q = "1.299"
+
+        with open(out_psat_filename + ".m","w") as new_psat_stream:
+            psat.write(new_psat_stream)
+
+
     def copy_psat(in_filename, out_filename):
         psat = read_psat(in_filename + ".m")
         with open(out_filename + ".m","w") as psat_stream:
@@ -780,6 +794,8 @@ def test006():
     #inner_test2()
 
     def inner_test3():
+        dosim("psat_base", "pf")
+
         copy_kill_shunt("psat_base","psat_c")
         dosim("psat_c", "pf")
 
@@ -804,8 +820,17 @@ def test006():
         dosim("psat_b", "pf")
         cycle("psat_b", "psat_c")
         dosim("psat_c", "pf")
-    inner_test5()
+    # inner_test5()
 
+    def inner_test6():
+        copy_kill_shunt_mod("psat_base", "psat_a")
+        dosim("psat_a", "pf")
+        cycle("psat_a", "psat_b")
+        dosim("psat_b", "pf")
+        cycle("psat_b", "psat_c")
+        dosim("psat_c", "pf")
+    inner_test6()
+        
 test006()
 
 

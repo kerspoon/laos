@@ -56,6 +56,7 @@ def clean_files():
     grem(".", r".*\.pyc")
     grem(".", r".*\.bch")
     grem(".", r".*_[1234567890]{2}\.txt")
+clean_files()
 
 
 def make_outages(prob, count):
@@ -527,8 +528,9 @@ def example4():
 
     data = """
            [example_4] opf
-             remove generator g9
-             set all demand 0.88
+             #remove generator g9
+             #set all demand 0.88
+             set all demand 0.5
            """
 
     scenario = text_to_scenario(data)
@@ -536,7 +538,6 @@ def example4():
     report = simulate_scenario(psat, scenario, clean)
 
     print "result = '" + str(report_in_limits(report)) + "'"
-
 
 # example4()
 
@@ -673,15 +674,24 @@ def test004():
     clean_files()
     clean = False
 
+    data = """
+           [notused] opf
+             #set all demand 0.5
+           """
+
+    scenario = text_to_scenario(data)
+
     psat = read_psat("rts.m")
-    report = single_simulate(psat, "opf", "seper", clean)
+    scenario.title = "noslack"
+    report = simulate_scenario(psat, scenario, clean)
     print "first result = '" + str(report_in_limits(report)) + "'"
 
-    psat = read_psat("rts2000.m")
-    report = single_simulate(psat, "opf", "aggre", clean)
+    psat = read_psat("rts2.m")
+    scenario.title = "slack"
+    report = simulate_scenario(psat, scenario, clean)
     print "second result = '" + str(report_in_limits(report)) + "'"
 
-# test004()
+test004()
 
 
 def test005():
@@ -785,14 +795,14 @@ def test006():
         dosim("psat_b", simtype)
     # inner_test7()
 
-test006()
+# test006()
 
 def test007():
     """batch and single should gave same results"""
     
     clean_files()
 
-    psat = read_psat("rts.m")
+    psat = read_psat("rts2.m")
     # prob = read_probabilities("rts.net")
     # batch = make_outages(prob, 2)
 
@@ -830,6 +840,65 @@ def test007():
 
 
     
+
+# -----------------------------------------------------------------------------
+
+def generate_cases(n_outages, n_failures):
+    
+    clean_files()    
+    psat = read_psat("rts.m")
+    prob = read_probabilities("rts.net")
+
+    outage_batch = make_outages(prob, n_outages)
+    batch_simulate(outage_batch, psat, 30)
+
+    with open("outage.bch", "w") as result_file:
+        outage_batch.write(result_file)
+
+    failure_batch = make_failures(prob, n_failures)
+    batch_simulate(failure_batch, psat, 30)
+
+    with open("failure.bch", "w") as result_file:
+        failure_batch.write(result_file)
+
+# generate_cases(100, 100)
+
+
+def simulate_cases(outage_batch, failure_batch, psat):
+    clean_files()
+
+    for scenario in outage_batch:
+        report = simulate_scenario(psat, scenario, False)
+        scenario_psat = report_to_psat(report, psat)
+        clean_files()
+
+        for x in failure_batch:
+            x.result = None
+
+        batch_simulate(failure_batch, scenario_psat, 30)
+
+        filename = scenario.title + ".bch2"
+        with open(filename, "w") as result_file:
+            failure_batch.write(result_file)
+        
+
+def runme(n_outages=100, n_failures=100):
+
+    clean_files()    
+    psat = read_psat("rts.m")
+    prob = read_probabilities("rts.net")
+
+    outage_batch = make_outages(prob, n_outages)
+    batch_simulate(outage_batch, psat, 30)
+    with open("outage.bch2", "w") as result_file:
+        outage_batch.write(result_file)
+
+    failure_batch = make_failures(prob, n_failures)
+    batch_simulate(failure_batch, psat, 30)
+    with open("failure.bch2", "w") as result_file:
+        failure_batch.write(result_file)
+
+    simulate_cases(outage_batch, failure_batch, psat)
 
 # -----------------------------------------------------------------------------
 

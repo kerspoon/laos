@@ -30,6 +30,7 @@ simulation_batch.py - SimulationBatch - batch_file - batch
 import unittest
 from modifiedtestcase import ModifiedTestCase
 from StringIO import StringIO
+from misc import as_csv
 
 #------------------------------------------------------------------------------
 #  eBNF
@@ -102,6 +103,13 @@ class Scenario(object):
         if self.result:
             stream.write("  result " + self.result + "\n")
 
+    def csv_write(self, stream):
+        self.invariant()
+        infoline = [self.title, self.simtype, self.all_demand, self.result]
+        kills = self.kill_bus + self.kill_line + self.kill_gen
+        stream.write(as_csv(infoline + kills)  + "\n")
+        
+
 
 #------------------------------------------------------------------------------
 #
@@ -133,6 +141,10 @@ class SimulationBatch(object):
     def write(self, stream):
         for scenario in self.scenarios:
             scenario.write(stream)
+
+    def csv_write(self, stream):
+        for scenario in self.scenarios:
+            scenario.csv_write(stream)
 
     def read(self, stream):
 

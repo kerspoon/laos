@@ -178,11 +178,9 @@ def report_to_psat(report, psat):
 
 
     # fix for reactive power on bus 39-43
-    new_psat.generators[39].v = "1.01401"
-    new_psat.generators[40].v = "1.01401"
-    new_psat.generators[41].v = "1.01401"
-    new_psat.generators[42].v = "1.01401"
-    new_psat.generators[43].v = "1.01401"
+    for x in range(39,44):
+        assert str(new_psat.generators[x].v) == "1.014"
+        new_psat.generators[x].v = "1.01401"
 
     # assert len(psat.shunts) == 0
     # assert new_psat.loads[6].q == "1.299"
@@ -241,7 +239,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
 
     for n, group in enumerate(split_every(size, batch)):
         timer_start = time.clock()
-        print "simulating batch",  n, "of", int(math.ceil(len(batch) / size))
+        print "simulating batch",  n+1, "of", int(math.ceil(len(batch) / size))+1
         sys.stdout.flush()
      
         # make the matlab_script
@@ -415,7 +413,8 @@ def simulate(matlab_filename, single_item=True):
     try:
 
         # print "simulate", matlab_filename
-        parameters = '-nodisplay -nojvm -nosplash -r '
+        parameters = '-nodisplay -nojvm -nosplash -minimize -r '
+        # parameters = '-automation -r '
         proc = subprocess.Popen('matlab ' + parameters + matlab_filename,
                                 shell=True,
                                 stdout=subprocess.PIPE,
@@ -424,14 +423,15 @@ def simulate(matlab_filename, single_item=True):
 
         so, se = proc.communicate()
      
-        # print "SE"
-        # print "================================="
-        # print se 
-        # print "================================="
-        # print "SO"
-        # print "================================="
-        # print so 
-        # print "================================="
+        if (True):
+            print "SE"
+            print "================================="
+            print se 
+            print "================================="
+            print "SO"
+            print "================================="
+            print so 
+            print "================================="
 
         assert se == "", "sim-error: " + se
 
@@ -445,10 +445,11 @@ def simulate(matlab_filename, single_item=True):
                 print "grab_next error:", so[idx:idx+30]
                 return False, idx+1
         
-            if so.find("IPM-OPF", idx) != -1:
-                idx2 = so.find("IPM-OPF", idx)
-                if so[idx:].startswith("IPM-OPF completed in"):
-                    print "grab_next error:", so[idx2:idx2+30]
+
+            idx2 = so.find("IPM-OPF", idx)
+            if idx2 != -1:
+                if not(so[idx2:].startswith("IPM-OPF completed in")):
+                    print "grab_next error:", so[idx2:idx2+35]
                     return False, idx2+1
             
             return True, idx+1
@@ -462,6 +463,10 @@ def simulate(matlab_filename, single_item=True):
             index = curr_idx
 
         assert len(result) >= 1, str(result)
+
+        # deal with islanding
+        assert so.find("Warning: Matrix is singular") == -1
+        assert so.find("Warning: Matrix is close to singular") == -1
 
         if single_item:
             print result
@@ -529,9 +534,7 @@ def example4():
 
     data = """
            [example_4] opf
-             #remove generator g9
-             #set all demand 0.88
-             set all demand 0.5
+             remove generator g18
            """
 
     scenario = text_to_scenario(data)
@@ -540,7 +543,7 @@ def example4():
 
     print "result = '" + str(report_in_limits(report)) + "'"
 
-# example4()
+example4()
 
 
 def example5():
@@ -847,22 +850,23 @@ def test007():
 def generate_cases(n_outages, n_failures):
     
     clean_files()    
+    batch_size = 100 
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
 
     outage_batch = make_outages(prob, n_outages)
-    batch_simulate(outage_batch, psat, 30)
-
-    with open("outage.bch2", "w") as result_file:
-        outage_batch.write(result_file)
+    batch_simulate(outage_batch, psat, batch_size)
 
     failure_batch = make_failures(prob, n_failures)
-    batch_simulate(failure_batch, psat, 30)
+    batch_simulate(failure_batch, psat, batch_size)
+
+    with open("outage.bch2", "w") as result_file:
+        outage_batch.csv_write(result_file)
 
     with open("failure.bch2", "w") as result_file:
-        failure_batch.write(result_file)
+        failure_batch.csv_write(result_file)
 
-# generate_cases(100, 100)
+# generate_cases(1000, 1000)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):
@@ -901,7 +905,7 @@ def runme(n_outages=100, n_failures=100):
 
     simulate_cases(outage_batch, failure_batch, psat)
 
-runme(10,10)
+# runme(10,10)
 
 # -----------------------------------------------------------------------------
 

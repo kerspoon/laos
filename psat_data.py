@@ -270,6 +270,9 @@ class PsatData(object):
 
     def set_all_demand(self, value):
         # Note:: should I change P, Q or both.
+
+        assert(0 < value < 2)
+
         for load in self.loads.values():
             newval  = load.p * value
             self.mismatch += load.p - newval
@@ -402,7 +405,10 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
         assert(total_gen != 0)
         
         multiplier = 1.0 + (mismatch / total_gen)
-        assert(0 <= multiplier <= 2)
+
+        # we shouldn't really care about the miltiplier as long as 
+        # the limits are being met should we?
+        assert(0 <= multiplier <= 5)
 
         if mismatch < 0:
             idx_gen = find_limit_min(multiplier)

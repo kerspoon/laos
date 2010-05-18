@@ -141,13 +141,13 @@ def TEST_duplicates_exist():
 #------------------------------------------------------------------------------
 def as_csv(iterable, sep = "  "):
     """a string of each item seperated by 'sep'"""
-    iterable = list(iterable)
-    res = ""
-    if len(iterable) == 0:
-        return ""
-    for item in iterable[:-1]:
-        res += str(item) + sep
-    return res + str(iterable[len(iterable)-1])
+    return sep.join(str(x) for x in list(iterable))
+
+def TEST_as_csv():
+    assert as_csv([1, 2, 3], ", ") == "1, 2, 3"
+    assert as_csv([1], "abc") == "1"
+    assert as_csv(xrange(5), "_") == "0_1_2_3_4"
+# TEST_as_csv()
 
 #------------------------------------------------------------------------------
 #  struct:

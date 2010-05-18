@@ -34,7 +34,7 @@ import time
 from StringIO import StringIO
 from contextlib import closing
 
-from simulation_batch import SimulationBatch
+from simulation_batch import SimulationBatch, Scenario
 from network_probability import NetworkProbability
 from psat_data import PsatData
 from psat_report import PsatReport
@@ -161,28 +161,28 @@ def report_to_psat(report, psat):
     new_psat = deepcopy(psat)
     pf = report.power_flow
 
+    assert len(new_psat.slack) == 1
     slack = new_psat.slack.values()[0]
     slack.v_magnitude = float(pf[slack.bus_no].v)
     slack.ref_angle = float(pf[slack.bus_no].phase)
-    # slack.p_guess = float(pf[slack.bus_no].pg)
+    slack.p_guess = float(pf[slack.bus_no].pg)
 
     for gen in new_psat.generators.values():
-        assert pf[gen.bus_no] != None
-        gen.p = float(pf[gen.bus_no].pg)
-        gen.v = float(pf[gen.bus_no].v)
+        if gen.bus_no in pf:
+            gen.p = float(pf[gen.bus_no].pg)
+            gen.v = float(pf[gen.bus_no].v)
 
     for load in new_psat.loads.values():
-        assert pf[load.bus_no] != None
-        load.p = float(pf[load.bus_no].pl)
-        load.q = float(pf[load.bus_no].ql)
-
+        if load.bus_no in pf:
+            load.p = float(pf[load.bus_no].pl)
+            load.q = float(pf[load.bus_no].ql)
 
     # fix for reactive power on bus 39-43
-    for x in range(39,44):
-        assert str(new_psat.generators[x].v) == "1.014"
-        new_psat.generators[x].v = "1.01401"
+    # for x in range(39,44):
+        # assert str(new_psat.generators[x].v) == "1.014"
+        # new_psat.generators[x].v = "1.01401"
 
-    # assert len(psat.shunts) == 0
+    # assert len(new_psat.shunts) == 0
     # assert new_psat.loads[6].q == "1.299"
 
     assert new_psat.in_limits()
@@ -534,7 +534,9 @@ def example4():
 
     data = """
            [example_4] opf
-             remove generator g18
+             remove generator g33
+             set all demand 0.7686144
+             remove bus 6
            """
 
     scenario = text_to_scenario(data)
@@ -543,7 +545,7 @@ def example4():
 
     print "result = '" + str(report_in_limits(report)) + "'"
 
-example4()
+# example4()
 
 
 def example5():
@@ -909,3 +911,36 @@ def runme(n_outages=100, n_failures=100):
 
 # -----------------------------------------------------------------------------
 
+
+def upec(n_failures=100):
+    """if we happen to have a stage one that kills the shunt bus then most bugs 
+    go away. use this to get some data."""
+
+    clean_files()
+    clean = False
+
+    data = """
+           [upec] opf
+             remove generator g33
+             set all demand 0.7686144
+             remove bus 6
+           """
+
+    scenario = text_to_scenario(data)
+    psat = read_psat("rts.m")
+
+    tmp_psat = scenario_to_psat(scenario, psat)
+    report = single_simulate(tmp_psat, scenario.simtype, scenario.title)
+    new_psat = report_to_psat(report, tmp_psat)
+
+    prob = read_probabilities("rts.net")
+    failure_batch = make_failures(prob, n_failures)
+
+    failure_batch.scenarios.insert(0, Scenario("basecase"))
+    batch_simulate(failure_batch, new_psat, 100, clean)
+
+    filename = scenario.title + ".bch2"
+    with open(filename, "w") as result_file:
+        failure_batch.csv_write(result_file)
+
+upec(1000)

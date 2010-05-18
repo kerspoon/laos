@@ -24,6 +24,28 @@ Files
 
  * **modifiedtestcase.py** a few utilities for unittest
 
+Bugs
+====
+
+ + slack-bus-bug - cannot kill g12
+ + reactive-limit-bug - caused by seperating generators onto virtual busses 
+                        example: (pf 0.772)
+ + kill-large-gen-bug - fix_mismatch fails when large gens are killed 
+                        example: (pf 1.107)
+ + islanding-bug - islanding should cause fail not error (e.g. kill bus 7)
+ + report_to_psat - shunt-bug - it might sometimes get included twice
+
+ + Re-run tests (again) as *both* opf and pf.
+
+To Do
+====
+
+ - look into using a distributed slack bus.
+ - quantize the continious data such as load forecast
+ - memoize results considering that loss of either unit on a bus is the same 
+   action as long as they are identical units.
+ - do unit commitment as well as OPF
+
 
 File Types
 ==========
@@ -118,3 +140,4 @@ To Try
  - clpsat.refresh = 0 % don't bother re-running the PF
  - clpsat.showopf % not sure
 
+ 

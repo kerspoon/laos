@@ -354,7 +354,6 @@ def single_matlab_script(filename, psat_filename, simtype):
         elif simtype == "opf":
             matlab_stream.write("OPF.basepg = 0;\n")
             matlab_stream.write("OPF.basepl = 0;\n")
-            matlab_stream.write("runpsat pf;\n")
             matlab_stream.write("runpsat opf;\n")
         else:
             raise Exception("expected pf or opf got: " + simtype)
@@ -392,7 +391,6 @@ def batch_matlab_script(filename, batch):
             if simtype == "pf":
                 matlab_stream.write("runpsat pf;\n")
             elif simtype == "opf":
-                matlab_stream.write("runpsat pf;\n")
                 matlab_stream.write("runpsat opf;\n")
             else:
                 raise Exception("expected pf or opf got: " + scenario.simtype)
@@ -400,6 +398,47 @@ def batch_matlab_script(filename, batch):
 
         matlab_stream.write("closepsat;\n")
         matlab_stream.write("exit\n")
+
+def parse_matlab_output(text):
+
+    def found(msg, in_text):
+        return in_text.find(msg) != -1
+    
+    result = []
+    split_by_sim = text.split("Newton-Raphson Method for Power Flow")
+    for n,sim_text in enumerate(split_by_sim[1:]):
+
+        passed = True
+
+        if found("Warning: Matrix is singular", sim_text):
+            print "singular matrix warning", n
+            passed = False
+
+        if found("Warning: Matrix is close to singular", sim_text):
+            print "near singular matrix warning", n
+            passed = False
+
+        if found("The error is increasing too much", sim_text):
+            print "large error", n
+            passed = False
+
+        if found("Convergence is likely not reachable", sim_text):
+            print "non-convergence", n
+            passed = False
+
+        if not found("Power Flow completed in", sim_text):
+            print "power flow not completed", n
+            passed = False
+
+        if found("IPM-OPF", sim_text):
+            if not found("IPM-OPF completed in", sim_text):
+                print "opf not completed", n
+                passed = False
+
+        result.append(passed)
+
+    assert len(result) >= 1, str(result)
+    return result
 
 
 def simulate(matlab_filename, single_item=True):
@@ -423,7 +462,7 @@ def simulate(matlab_filename, single_item=True):
 
         so, se = proc.communicate()
      
-        if (True):
+        if (False):
             print "SE"
             print "================================="
             print se 
@@ -435,38 +474,8 @@ def simulate(matlab_filename, single_item=True):
 
         assert se == "", "sim-error: " + se
 
-
-        def grab_next(start):
-            start = so.find("Power Flow Computation", start) + 1 
-
-            idx = so.find("Power Flow", start)
-
-            if not(so[idx:].startswith("Power Flow completed in")):
-                print "grab_next error:", so[idx:idx+30]
-                return False, idx+1
-        
-
-            idx2 = so.find("IPM-OPF", idx)
-            if idx2 != -1:
-                if not(so[idx2:].startswith("IPM-OPF completed in")):
-                    print "grab_next error:", so[idx2:idx2+35]
-                    return False, idx2+1
-            
-            return True, idx+1
-
-        index = 0
-        result = []
-        while(so.find("Power Flow", index) != -1):
-            curr_res, curr_idx = grab_next(index)
-            # print "we are here --->", so[curr_idx:curr_idx+30]
-            result.append(curr_res)
-            index = curr_idx
-
+        result = parse_matlab_output(so)
         assert len(result) >= 1, str(result)
-
-        # deal with islanding
-        assert so.find("Warning: Matrix is singular") == -1
-        assert so.find("Warning: Matrix is close to singular") == -1
 
         if single_item:
             print result
@@ -868,7 +877,7 @@ def generate_cases(n_outages, n_failures):
     with open("failure.bch2", "w") as result_file:
         failure_batch.csv_write(result_file)
 
-# generate_cases(1000, 1000)
+generate_cases(100, 100)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):
@@ -917,17 +926,17 @@ def upec(n_failures=100):
     go away. use this to get some data."""
 
     clean_files()
-    clean = False
+    clean = True
 
     data = """
            [upec] opf
-             remove generator g33
-             set all demand 0.7686144
-             remove bus 6
+             # remove generator g33
+             # set all demand 0.7686144
+             # remove bus 6
            """
 
     scenario = text_to_scenario(data)
-    psat = read_psat("rts.m")
+    psat = read_psat("rts2.m")
 
     tmp_psat = scenario_to_psat(scenario, psat)
     report = single_simulate(tmp_psat, scenario.simtype, scenario.title)
@@ -943,4 +952,4 @@ def upec(n_failures=100):
     with open(filename, "w") as result_file:
         failure_batch.csv_write(result_file)
 
-upec(1000)
+# upec(10)

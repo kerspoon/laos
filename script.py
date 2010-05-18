@@ -176,7 +176,6 @@ def report_to_psat(report, psat):
         load.p = float(pf[load.bus_no].pl)
         load.q = float(pf[load.bus_no].ql)
 
-    assert len(psat.shunts) == 0
 
     # fix for reactive power on bus 39-43
     new_psat.generators[39].v = "1.01401"
@@ -185,7 +184,9 @@ def report_to_psat(report, psat):
     new_psat.generators[42].v = "1.01401"
     new_psat.generators[43].v = "1.01401"
 
-    assert new_psat.loads[6].q == "1.299"
+    # assert len(psat.shunts) == 0
+    # assert new_psat.loads[6].q == "1.299"
+
     assert new_psat.in_limits()
 
     return new_psat
@@ -691,7 +692,7 @@ def test004():
     report = simulate_scenario(psat, scenario, clean)
     print "second result = '" + str(report_in_limits(report)) + "'"
 
-test004()
+# test004()
 
 
 def test005():
@@ -852,13 +853,13 @@ def generate_cases(n_outages, n_failures):
     outage_batch = make_outages(prob, n_outages)
     batch_simulate(outage_batch, psat, 30)
 
-    with open("outage.bch", "w") as result_file:
+    with open("outage.bch2", "w") as result_file:
         outage_batch.write(result_file)
 
     failure_batch = make_failures(prob, n_failures)
     batch_simulate(failure_batch, psat, 30)
 
-    with open("failure.bch", "w") as result_file:
+    with open("failure.bch2", "w") as result_file:
         failure_batch.write(result_file)
 
 # generate_cases(100, 100)
@@ -899,6 +900,8 @@ def runme(n_outages=100, n_failures=100):
         failure_batch.write(result_file)
 
     simulate_cases(outage_batch, failure_batch, psat)
+
+runme(10,10)
 
 # -----------------------------------------------------------------------------
 

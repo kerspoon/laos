@@ -55,6 +55,7 @@ def clean_files():
     grem(".", r"matlab_.*\.m")
     grem(".", r".*\.pyc")
     grem(".", r".*\.bch")
+    grem(".", r".*\.csv")
     grem(".", r".*_[1234567890]{2}\.txt")
 clean_files()
 
@@ -865,17 +866,21 @@ def generate_cases(n_outages, n_failures):
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
 
-    outage_batch = make_outages(prob, n_outages)
-    batch_simulate(outage_batch, psat, batch_size)
+    if n_outages:
+        outage_batch = make_outages(prob, n_outages)
+        batch_simulate(outage_batch, psat, batch_size)
 
-    failure_batch = make_failures(prob, n_failures)
-    batch_simulate(failure_batch, psat, batch_size)
+    if n_failures:
+        failure_batch = make_failures(prob, n_failures)
+        batch_simulate(failure_batch, psat, batch_size)
 
-    with open("outage.bch2", "w") as result_file:
-        outage_batch.csv_write(result_file)
+    if n_outages:
+        with open("outage.csv", "w") as result_file:
+            outage_batch.csv_write(result_file)
 
-    with open("failure.bch2", "w") as result_file:
-        failure_batch.csv_write(result_file)
+    if n_failures:
+        with open("failure.csv", "w") as result_file:
+            failure_batch.csv_write(result_file)
 
 generate_cases(100, 100)
 

@@ -37,14 +37,17 @@ Bugs
 
  + Re-run tests (again) as *both* opf and pf.
 
+
 To Do
 ====
 
+ - FIX BUGS
  - look into using a distributed slack bus.
  - quantize the continious data such as load forecast
  - memoize results considering that loss of either unit on a bus is the same 
    action as long as they are identical units.
  - do unit commitment as well as OPF
+ - run N-1 test
 
 
 File Types

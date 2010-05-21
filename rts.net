@@ -74,7 +74,7 @@ generator G11 7 1200  50    U100
 generator G12 13 950   50    U197         
 generator G13 13 950   50    U197         
 generator G14 13 950   50    U197         
-generator G15 14 -1    -1  SyncCond   
+# generator G15 14 -1    -1  SyncCond   
 generator G16 15 2940  60    U12           
 generator G17 15 2940  60    U12           
 generator G18 15 2940  60    U12           

@@ -119,11 +119,15 @@ class NetworkProbability(object):
         types = "int real real".split()
 
         def setup(self):
-            failrate = self.fail_rate / (24.0 * 365.0)
-            mttf = float((24.0 * 365.0) / self.fail_rate)
-            mttr = float(self.repair_rate)
-            self.pfail = 1-probability_failure(failrate)
-            self.pout = 1-probability_outage(mttf, mttr)
+            if self.fail_rate != 0.0:    
+                failrate = self.fail_rate / (24.0 * 365.0)
+                mttf = float((24.0 * 365.0) / self.fail_rate)
+                mttr = float(self.repair_rate)
+                self.pfail = 1-probability_failure(failrate)
+                self.pout = 1-probability_outage(mttf, mttr)
+            else:
+                self.pfail = 0
+                self.pout = 0
             # print "Bus: %f %f" % (self.pfail, self.pout)
 
     class Line(struct):
@@ -131,11 +135,15 @@ class NetworkProbability(object):
         types = "str int int real real real".split()
 
         def setup(self):
-            failrate = self.fail_rate / (24.0 * 365.0)
-            mttf = float((24.0 * 365.0) / self.fail_rate)
-            mttr = float(self.repair_rate)
-            self.pfail = 1-probability_failure(failrate)
-            self.pout = 1-probability_outage(mttf, mttr)
+            if self.fail_rate != 0.0:    
+                failrate = self.fail_rate / (24.0 * 365.0)
+                mttf = float((24.0 * 365.0) / self.fail_rate)
+                mttr = float(self.repair_rate)
+                self.pfail = 1-probability_failure(failrate)
+                self.pout = 1-probability_outage(mttf, mttr)
+            else:
+                self.pfail = 0
+                self.pout = 0
             # print "Line: %f %f" % (self.pfail , self.pout)
 
     class Generator(struct):
@@ -210,7 +218,7 @@ class NetworkProbability(object):
             for crow in self.crows:
                 if crow.line1 == kill:
                     if fail(crow.probability):
-                        print "crow fail:", crow.line1, kill
+                        # print "crow fail:", crow.line1, kill
                         crowfails.append(crow.line2)
         return crowfails
 
@@ -229,15 +237,57 @@ class NetworkProbability(object):
         scen = Scenario("failure" + name, "pf")
         scen.kill_bus = [bus.bus_id for bus in self.busses if fail(bus.pfail)]
         scen.kill_line = [line.name for line in 
-                             self.lines if fail(line.pfail)]
-        scen.kill_generator = [generator.name for generator in 
-                                  self.generators if fail(generator.pfail)]
+                          self.lines if fail(line.pfail)]
+        scen.kill_gen = [generator.name for generator in 
+                         self.generators if fail(generator.pfail)]
         scen.kill_line = scen.kill_line + self.crow_fails(scen.kill_line)
 
         # NOTE:: 1.0 should be the value of forcast load which will always
         #        be lower than 1, but it shouldn't make too much difference. 
         scen.all_demand = buslevel.actual_load2(1.0)
+
+        # mx = [g.pfail for g in self.generators]
+        # print "%s\t%f\t%f\t%f\t%d\n" % (name, min(mx), max(mx), avg(mx), len(mx))
+
         return scen
+
+    def write_stats(self, stream):
+        
+        assert len(self.busses)
+        assert len(self.lines)
+        assert len(self.generators)
+        assert len(self.crows)
+
+        bus_pout = [x.pout for x in self.busses]
+        bus_pfail = [x.pfail for x in self.busses]
+
+        lines_pout = [x.pout for x in self.lines]
+        lines_pfail = [x.pfail for x in self.lines]
+
+        generators_pout = [x.pout for x in self.generators]
+        generators_pfail = [x.pfail for x in self.generators]
+
+        crows_prob = [x.probability for x in self.crows]
+
+
+        def avg(x):
+            return sum(x) / len(x)
+
+        def helper(name, mx):
+            if len(mx)== 0:
+                print mx
+            stream.write("%s\t%f\t%f\t%f\t%d\n" % (name, min(mx), max(mx), avg(mx), len(mx)))
+        
+        stream.write("name\tmin\tmax\tavg\tlen\n")
+        helper("Bus pout", bus_pout)
+        helper("Bus pfail", bus_pfail)
+        helper("Lin pout", lines_pout)
+        helper("Lin pfail", lines_pfail)
+        helper("Gen pout", generators_pout)
+        helper("Gen pfail", generators_pfail)
+        helper("Crow prob", crows_prob)
+
+        
 
 
 #------------------------------------------------------------------------------
@@ -275,6 +325,45 @@ crow c34 c30 0.075
     for _ in range(10000):
         scen = np.outages("test")
         scen2 = np.failures("test")
+# example()
 
-example()
+
+def example2():
+
+    np = NetworkProbability()
+    np.read(open("rts.net"))
+    np.write_stats(sys.stdout)
+    print np.failures("bob")
+# example2()
+
+
+def TEST_crowfail():
+       
+    from simulation_batch import SimulationBatch
+
+    text = """# NetworkProbability data file
+# bus bus_id fail_rate repair_rate
+bus 101 0.0 10.0
+bus 102 0.0 10.0
+bus 103 0.0 10.0
+# line name fbus tbus fail_rate repair_rate trans_fail
+line a1 101 102 100000000000.0 10.0 0.0
+line a2 102 103 0.0 10.0 0.0
+# crow line1 line2 probability
+crow a1 a2 0.5
+"""
+
+    count = 100000
+
+    prob = NetworkProbability(); 
+    prob.read(StringIO(text))
+
+    batch = SimulationBatch()
+    for x in range(count):
+        batch.add(prob.outages(str(x)))
+    assert count == len(batch)
+
+    batch.write_stats(sys.stdout)
+
+# TEST_crowfail()
 

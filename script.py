@@ -868,21 +868,26 @@ def generate_cases(n_outages, n_failures):
 
     if n_outages:
         outage_batch = make_outages(prob, n_outages)
-        batch_simulate(outage_batch, psat, batch_size)
+        # batch_simulate(outage_batch, psat, batch_size)
 
-    if n_failures:
-        failure_batch = make_failures(prob, n_failures)
-        batch_simulate(failure_batch, psat, batch_size)
-
-    if n_outages:
         with open("outage.csv", "w") as result_file:
             outage_batch.csv_write(result_file)
 
+        print "-"*80
+        print "outage stats"
+        outage_batch.write_stats(sys.stdout)
+
     if n_failures:
+        failure_batch = make_failures(prob, n_failures)
+        # batch_simulate(failure_batch, psat, batch_size)
+
         with open("failure.csv", "w") as result_file:
             failure_batch.csv_write(result_file)
 
-generate_cases(100, 100)
+        print "failure stats"
+        failure_batch.write_stats(sys.stdout)
+
+generate_cases(5000000, 5000000)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):

@@ -31,6 +31,7 @@ import unittest
 from modifiedtestcase import ModifiedTestCase
 from StringIO import StringIO
 from misc import as_csv
+import collections
 
 #------------------------------------------------------------------------------
 #  eBNF
@@ -107,7 +108,10 @@ class Scenario(object):
         self.invariant()
         infoline = [self.title, self.simtype, self.all_demand, self.result]
         kills = self.kill_bus + self.kill_line + self.kill_gen
-        stream.write(as_csv(infoline + kills)  + "\n")
+        stream.write(as_csv(infoline + kills,"\t")  + "\n")
+
+    def num_kills(self):
+        return len(self.kill_bus) + len(self.kill_gen) + len(self.kill_line)
         
 
 
@@ -198,6 +202,41 @@ class SimulationBatch(object):
                                 % line[0])
 
         self.scenarios[-1].invariant()
+
+    def write_stats(self, stream):
+        stream.write("scenario with\t%d\titems\n" % len(self))
+        
+        result_count = collections.defaultdict(int)
+        fail_count = collections.defaultdict(int)
+
+        bus_count = collections.defaultdict(int)
+        line_count = collections.defaultdict(int)
+        gen_count = collections.defaultdict(int)
+
+        for scen in self:
+            fail_count[scen.num_kills()] += 1
+            result_count[str(scen.result)] += 1
+            bus_count[len(scen.kill_bus)] += 1
+            line_count[len(scen.kill_line)] += 1
+            gen_count[len(scen.kill_gen)] += 1
+
+        stream.write("Failures\tOccurance\n")
+        map(lambda x: stream.write("%d\t%d\n" % x), fail_count.items())
+        stream.write("\n")
+        stream.write("Result\tOccurance\n")
+        map(lambda x: stream.write("%s\t%d\n" % x), result_count.items())
+        stream.write("\n")
+        stream.write("Bus\tOccurance\n")
+        map(lambda x: stream.write("%d\t%d\n" % x), bus_count.items())
+        stream.write("\n")
+        stream.write("Line\tOccurance\n")
+        map(lambda x: stream.write("%d\t%d\n" % x), line_count.items())
+        stream.write("\n")
+        stream.write("Gen\tOccurance\n")
+        map(lambda x: stream.write("%d\t%d\n" % x), gen_count.items())
+        stream.write("-"*80 + "\n")
+        
+
 
 
 #------------------------------------------------------------------------------

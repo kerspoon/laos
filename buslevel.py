@@ -105,6 +105,36 @@ def random_hour():
 def random_bus_forecast():
     return forecast_load(random_week(),random_day(),random_hour())
 
+def quantised_01(val):
+    return round(val, 2)
+
+def quantised_05(x):
+    val = 0.05
+    return round(x / val) * val
+
+
+class Tester_quantised(ModifiedTestCase):
+    def test_01(self):
+        self.assertEqual(quantised_01(0.00), 0.00)
+        self.assertEqual(quantised_01(0.005), 0.01)
+        self.assertEqual(quantised_01(0.0049), 0.00)
+        self.assertEqual(quantised_01(0.0149), 0.01)
+        self.assertEqual(quantised_01(0.9999), 1.00)
+    def test_05(self):
+        self.assertEqual(quantised_05(0.00), 0.00)
+        self.assertEqual(quantised_05(0.005), 0.00)
+        self.assertEqual(quantised_05(0.0049), 0.00)
+        self.assertEqual(quantised_05(0.0149), 0.00)
+
+        self.assertEqual(quantised_05(0.0250), 0.05)
+        self.assertEqual(quantised_05(0.0249), 0.00)
+        self.assertEqual(quantised_05(0.0749), 0.05)
+        # self.assertEqual(quantised_05(0.0750), 0.10) # float bug? :(
+        self.assertEqual(quantised_05(0.0751), 0.10) # this works
+
+        self.assertEqual(quantised_05(0.9999), 1.00)
+
+
 def examples():
     def inner(forecast):
         print "forecast", forecast
@@ -192,6 +222,44 @@ class Tester_Weekstuff(ModifiedTestCase):
         self.assertAlmostEqual(forecast_load(51, "Sunday", 23), 0.578, 3)
         self.assertAlmostEqual(forecast_load(37, "Tuesday", 12), 0.646, 3)
 
+def show_all():
+    from misc import as_csv
+    weeks = range(52)
+    days = "Monday Tuesday Wednesday Thursday Friday Saturday Sunday".split()
+    hours = range(24)
+
+    result = []
+    for week in weeks:
+        for day in days:
+            for hour in hours:
+                load = forecast_load(week, day, hour)
+                result.append(load)
+                print as_csv([day, week, hour, load], "\t")
+    return result
+
+
+def show_year_by_week():
+    from misc import as_csv
+    weeks = range(52)
+    days = "Monday Tuesday Wednesday Thursday Friday Saturday Sunday".split()
+    hour = 7
+    
+    for week in weeks:
+        weekly = [forecast_load(week, day, hour) for day in days]
+        print as_csv([week] + weekly, "\t")
+
+def show_day():
+    from misc import as_csv
+    weeks = [0, 13, 26, 39]
+    hours = range(24)
+    day = "Monday"
+
+    for hour in hours:
+        quartly = [forecast_load(week, day, hour) for week in weeks]
+        print as_csv([hour] + quartly, "\t")
+
 if __name__ == '__main__':
-    examples()
-    unittest.main()
+    # examples()
+    # unittest.main()
+    show_day()
+

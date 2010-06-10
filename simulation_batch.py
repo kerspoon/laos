@@ -234,7 +234,7 @@ class SimulationBatch(object):
         stream.write("\n")
         stream.write("Gen\tOccurance\n")
         map(lambda x: stream.write("%d\t%d\n" % x), gen_count.items())
-        stream.write("-"*80 + "\n")
+        stream.write("-"*80 + "\n")        
         
 
 

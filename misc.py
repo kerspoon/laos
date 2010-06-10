@@ -249,3 +249,35 @@ def TEST_struct():
     assert str(bus) == "101 0.025 13.0"
 
 # TEST_struct()
+
+
+
+#------------------------------------------------------------------------------
+#  round_to:
+#------------------------------------------------------------------------------
+def round_to(val, x):
+    """round x to the nearest `val`
+       val must be an int"""
+    return int(round(x / float(val)) * val)
+
+
+def TEST_round_to():
+    # 10
+    assert round_to(10, 0) == 0
+    assert round_to(10, 1) == 0
+    assert round_to(10, 4) == 0
+    assert round_to(10, 5) == 10
+    assert round_to(10, 6) == 10
+    assert round_to(10, 10) == 10
+    assert round_to(10, 15) == 20
+    # 5
+    assert round_to(5, 0) == 0
+    assert round_to(5, 1) == 0
+    assert round_to(5, 2.4) == 0
+    assert round_to(5, 2.5) == 5
+    assert round_to(5, 4) == 5
+    assert round_to(5, 4.9) == 5
+    assert round_to(5, 5) == 5
+    assert round_to(5, 5.1) == 5
+    assert round_to(5, 10) == 10
+# TEST_round_to()

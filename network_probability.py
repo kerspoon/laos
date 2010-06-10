@@ -31,6 +31,7 @@ from misc import struct, read_struct, as_csv
 import random
 import math
 import sys
+import collections
 from StringIO import StringIO
 
 from simulation_batch import Scenario
@@ -230,7 +231,9 @@ class NetworkProbability(object):
         scen.kill_gen = [generator.name for generator in 
                          self.generators if fail(generator.pout)]
         scen.kill_line = scen.kill_line + self.crow_fails(scen.kill_line)
-        scen.all_demand = buslevel.random_bus_forecast()
+
+        # quantize the forecast
+        scen.all_demand = buslevel.quantised_05(buslevel.random_bus_forecast())
         return scen
 
     def failures(self, name):
@@ -244,12 +247,24 @@ class NetworkProbability(object):
 
         # NOTE:: 1.0 should be the value of forcast load which will always
         #        be lower than 1, but it shouldn't make too much difference. 
-        scen.all_demand = buslevel.actual_load2(1.0)
+        scen.all_demand = buslevel.quantised_05(buslevel.actual_load2(1.0))
 
         # mx = [g.pfail for g in self.generators]
         # print "%s\t%f\t%f\t%f\t%d\n" % (name, min(mx), max(mx), avg(mx), len(mx))
 
         return scen
+
+    def make_outages(count):
+        """func make_outages         :: Int -> SimulationBatch
+           ----
+           Monte Carlo sample the network for it's expected condition. 
+           e.g. existing outages, weather & load forcast, etc.
+        """
+        batch = SimulationBatch()
+        for x in range(count):
+            batch.add(prob.outages(str(x)))
+        assert count == len(batch)
+        return batch
 
     def write_stats(self, stream):
         
@@ -325,8 +340,10 @@ crow c34 c30 0.075
     for _ in range(10000):
         scen = np.outages("test")
         scen2 = np.failures("test")
-# example()
 
+        scen.csv_write(sys.stdout)
+        scen2.csv_write(sys.stdout)
+# example()
 
 def example2():
 
@@ -355,7 +372,7 @@ crow a1 a2 0.5
 
     count = 100000
 
-    prob = NetworkProbability(); 
+    prob = NetworkProbability() 
     prob.read(StringIO(text))
 
     batch = SimulationBatch()
@@ -367,3 +384,25 @@ crow a1 a2 0.5
 
 # TEST_crowfail()
 
+
+def TEST_bus_level_quantise():
+    
+    count = 1000000
+
+    prob = NetworkProbability()
+    prob.read(StringIO(""))
+
+    out_set_count = collections.defaultdict(int)
+    fail_set_count = collections.defaultdict(int)
+    for x in range(count):
+        out_set_count[str(prob.outages("x").all_demand)] += 1
+        fail_set_count[str(prob.failures("x").all_demand)] += 1
+    
+    stream = sys.stdout
+    print "-"*80
+    map(lambda x: stream.write("%s\t%d\n" % x), out_set_count.items())
+    print "-"*80
+    map(lambda x: stream.write("%s\t%d\n" % x), fail_set_count.items())
+    print "-"*80
+
+TEST_bus_level_quantise()

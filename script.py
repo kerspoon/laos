@@ -887,7 +887,7 @@ def generate_cases(n_outages, n_failures):
         print "failure stats"
         failure_batch.write_stats(sys.stdout)
 
-generate_cases(5000000, 5000000)
+generate_cases(2000000, 000000)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):

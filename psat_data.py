@@ -200,6 +200,13 @@ class PsatData(object):
         write_section(stream, self.supply, "Supply")
 
     def remove_bus(self, bus_no):
+        print "remove_bus", bus_no
+
+        # really should be an 'assert' not an 'if' but make testing easier
+        if len(self.slack) == 1:
+            slack = self.slack.values()[0]
+            assert slack.bus_no != bus_no
+ 
 
         assert self.busses[bus_no].bus_no == bus_no
         del self.busses[bus_no]
@@ -244,10 +251,6 @@ class PsatData(object):
                 self.mismatch += load.p
                 del self.loads[idx]
 
-        # really should be an 'assert' not an 'if' but make testing easier
-        if len(self.slack) == 1:
-            slack = self.slack.values()[0]
-            assert slack.bus_no != bus_no, "can't delete slack bus"
 
     def remove_line(self, line_id):
         del self.lines[line_id]
@@ -263,10 +266,52 @@ class PsatData(object):
         """
 
         bus_no = self.supply[supply_id].bus_no
-        assert bus_no in self.generators, "missing generator info, slack?"
-        self.mismatch -= self.generators[bus_no].p 
-        del self.generators[bus_no]
-        del self.supply[supply_id]
+
+        assert len(self.slack) == 1
+        slack = self.slack.values()[0]
+
+        if slack.bus_no == bus_no:
+            print "deleting slack bus"
+
+            # lets just hope that's accurate, it's probably not.
+            self.mismatch -= slack.p_guess 
+
+            # del self.generators[bus_no] 
+            # we are not doing this because we instead change the slack to the
+            # new value from the chosen bus. 
+            
+            # we do want to remove this. 
+            del self.supply[supply_id]
+
+            allowed_slacks = [37, 38]
+            gen = None 
+            for x in allowed_slacks:
+                if x in self.generators:
+                    print "new slack =", x
+                    assert self.generators[x].bus_no == x, "%s, %s" % (self.generators[x].bus_no, x)
+                    gen = self.generators[x]
+                    break
+            assert gen, "no slacks bus"
+
+            slack.bus_no      = gen.bus_no
+            slack.s_rating    = gen.s_rating
+            slack.v_rating    = gen.v_rating
+            slack.v_magnitude = gen.v
+            slack.ref_angle   = 0.0
+            slack.q_max       = gen.q_max
+            slack.q_min       = gen.q_min
+            slack.v_max       = gen.v_max
+            slack.v_min       = gen.v_min
+            slack.p_guess     = gen.p
+            slack.lp_coeff    = gen.lp_coeff
+            slack.ref_bus     = 1.0
+            slack.status      = gen.status
+            del self.generators[gen.bus_no]
+        else:
+            assert bus_no in self.generators, "missing generator info"
+            self.mismatch -= self.generators[bus_no].p 
+            del self.generators[bus_no]
+            del self.supply[supply_id]
 
     def set_all_demand(self, value):
         # Note:: should I change P, Q or both.

@@ -260,6 +260,6 @@ def show_day():
 
 if __name__ == '__main__':
     # examples()
-    # unittest.main()
-    show_day()
+    unittest.main()
+    # show_day()
 

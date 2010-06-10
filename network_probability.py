@@ -254,18 +254,6 @@ class NetworkProbability(object):
 
         return scen
 
-    def make_outages(count):
-        """func make_outages         :: Int -> SimulationBatch
-           ----
-           Monte Carlo sample the network for it's expected condition. 
-           e.g. existing outages, weather & load forcast, etc.
-        """
-        batch = SimulationBatch()
-        for x in range(count):
-            batch.add(prob.outages(str(x)))
-        assert count == len(batch)
-        return batch
-
     def write_stats(self, stream):
         
         assert len(self.busses)
@@ -405,4 +393,4 @@ def TEST_bus_level_quantise():
     map(lambda x: stream.write("%s\t%d\n" % x), fail_set_count.items())
     print "-"*80
 
-TEST_bus_level_quantise()
+# TEST_bus_level_quantise()

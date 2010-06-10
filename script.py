@@ -172,11 +172,15 @@ def report_to_psat(report, psat):
         if gen.bus_no in pf:
             gen.p = float(pf[gen.bus_no].pg)
             gen.v = float(pf[gen.bus_no].v)
+        else:
+            print "ERROR:", gen.bus_no
 
     for load in new_psat.loads.values():
         if load.bus_no in pf:
             load.p = float(pf[load.bus_no].pl)
             load.q = float(pf[load.bus_no].ql)
+        else:
+            print "ERROR:", load.bus_no
 
     # fix for reactive power on bus 39-43
     # for x in range(39,44):
@@ -544,10 +548,12 @@ def example4():
 
     data = """
            [example_4] opf
-             remove generator g33
-             set all demand 0.7686144
-             remove bus 6
+remove generator g12
            """
+
+             #remove generator g33
+             #set all demand 0.7686144
+             #remove bus 6
 
     scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
@@ -565,6 +571,24 @@ def example5():
 
     data = """
            [base] opf
+           [dead_slack] opf
+             remove generator g12
+           [two_dead_slack] opf
+             remove generator g12
+             remove generator g13
+           [three_dead_slack] opf
+             remove generator g12
+             remove generator g15
+           [four_dead_slack] opf
+             remove generator g13
+             remove generator g12
+           [five_dead_slack] opf
+             remove generator g15
+             remove generator g12
+           [all_dead_slack] opf
+             remove generator g12
+             remove generator g13
+             remove generator g15
            [rem_bus_1] opf
              remove bus 1
            [rem_li_a1] opf
@@ -586,7 +610,7 @@ def example5():
         print "result = '" + str(report_in_limits(report)) + "'"
 
 
-# example5()
+example5()
 
 
 # -----------------------------------------------------------------------------
@@ -887,7 +911,7 @@ def generate_cases(n_outages, n_failures):
         print "failure stats"
         failure_batch.write_stats(sys.stdout)
 
-generate_cases(2000000, 000000)
+# generate_cases(2000000, 000000)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):

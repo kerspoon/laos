@@ -69,7 +69,7 @@ def make_outages(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.outages(str(x)))
-    assert count == len(batch)
+    assert count == batch.size()
     return batch
 
 
@@ -82,7 +82,7 @@ def make_failures(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.failures(str(x)))
-    assert count == len(batch)
+    assert count == batch.size()
     return batch
 
 
@@ -610,7 +610,7 @@ def example5():
         print "result = '" + str(report_in_limits(report)) + "'"
 
 
-example5()
+# example5()
 
 
 # -----------------------------------------------------------------------------
@@ -911,7 +911,7 @@ def generate_cases(n_outages, n_failures):
         print "failure stats"
         failure_batch.write_stats(sys.stdout)
 
-# generate_cases(2000000, 000000)
+generate_cases(0, 2000000)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):

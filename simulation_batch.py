@@ -32,6 +32,7 @@ from modifiedtestcase import ModifiedTestCase
 from StringIO import StringIO
 from misc import as_csv
 import collections
+import hashlib
 
 #------------------------------------------------------------------------------
 #  eBNF
@@ -75,9 +76,10 @@ import collections
 
 class Scenario(object):
 
-    def __init__(self, title, simtype="pf"):
+    def __init__(self, title, simtype="pf", count=1):
         self.title = title
         self.simtype = simtype
+        self.count = count
         self.kill_bus = []
         self.kill_gen = []
         self.kill_line = []
@@ -86,13 +88,19 @@ class Scenario(object):
 
     def invariant(self):
         assert len(self.title) > 0
+        assert self.count > 0
         assert self.simtype in set(["pf", "opf"])
         if self.result:
             assert self.result in set(["pass", "fail", "error"])
 
     def write(self, stream):
         self.invariant()
-        stream.write("[" + self.title + "] " + self.simtype + "\n")
+
+        if self.count != 1:
+            stream.write("[%s] %s %d\n" % (self.title, self.simtype, self.count))
+        else:
+            stream.write("[%s] %s\n" % (self.title, self.simtype))
+            
         for kill in self.kill_bus:
             stream.write("  remove bus " + str(kill) + "\n")
         for kill in self.kill_line:
@@ -106,13 +114,34 @@ class Scenario(object):
 
     def csv_write(self, stream):
         self.invariant()
-        infoline = [self.title, self.simtype, self.all_demand, self.result]
+        infoline = [self.title, self.simtype, self.count, self.all_demand, self.result]
         kills = self.kill_bus + self.kill_line + self.kill_gen
         stream.write(as_csv(infoline + kills,"\t")  + "\n")
 
     def num_kills(self):
         return len(self.kill_bus) + len(self.kill_gen) + len(self.kill_line)
-        
+
+    def dicthash(self):
+        """returns a text of the csv value *without* the count title or 
+           result. To be used to store a Scenario in a dict"""
+        self.invariant()
+        infoline = [self.simtype, self.all_demand]
+        kills = self.kill_bus + self.kill_line + self.kill_gen
+        return as_csv(infoline + kills,"\t")
+
+    def equal(self, other):
+        """doesn't compare: count, result, or title"""
+        self.invariant()
+        other.invariant()
+        if self.simtype != other.simtype: return False
+        if self.all_demand != other.all_demand: return False
+        if self.kill_bus != other.kill_bus: return False
+        if self.kill_line != other.kill_line: return False
+        if self.kill_gen != other.kill_gen: return False
+        return True
+
+    def increment(self, val=1):
+        self.count += val
 
 
 #------------------------------------------------------------------------------
@@ -128,33 +157,55 @@ class SimulationBatch(object):
     """
 
     def __init__(self):
-        self.scenarios = []
+        self.scenarios = {}
 
     def __iter__(self):
-        return iter(self.scenarios)
+        return iter(self.scenarios.values())
 
     def __len__(self):
         return len(self.scenarios)
 
-    def __getitem__(self, key):
-        return self.scenarios[key]
+    def size(self):
+        return sum(x.count for x in self)
 
     def add(self, scenario):
-        self.scenarios.append(scenario)
+
+        # if already added increment count rather than append.
+
+        scenario.invariant()
+        dicthash = scenario.dicthash()
+
+        if dicthash in self.scenarios:
+            
+            # print "Updated [%d] = %s" % (self.scenarios[dicthash].count+1, 
+            #                              dicthash)
+
+            # make sure we don't have hash collision
+            assert self.scenarios[dicthash].equal(scenario)
+
+            # make sure we keep result info
+            if scenario.result:
+                if self.scenarios[dicthash].result:
+                    assert scenario.result == self.scenarios[dicthash].result
+                else:
+                    self.scenarios[dicthash].result = scenario.result
+
+            self.scenarios[dicthash].increment(scenario.count)
+        else:
+            # print "New [1]", dicthash
+            self.scenarios[dicthash] = scenario
 
     def write(self, stream):
-        for scenario in self.scenarios:
+        for scenario in self:
             scenario.write(stream)
 
     def csv_write(self, stream):
-        for scenario in self.scenarios:
+        for scenario in self:
             scenario.csv_write(stream)
 
     def read(self, stream):
 
-        def add_kill(component, name):
-            # add the kill to the current contingency
-            self.scenarios[-1].kill[component].append(name)
+        current_scen = None
 
         for line in stream:
 
@@ -166,20 +217,30 @@ class SimulationBatch(object):
 
             # title
             elif line[0].startswith("["):
+                if current_scen is not None:
+                    # logger.debug("Added Scenario: %s" % title)
+                    self.add(current_scen)
+
                 title = line[0][1:-1]
                 simtype = line[1]
+
+                if len(line) == 3:
+                    count = int(line[2])
+                else:
+                    assert len(line) == 2
+                    count = 1
+
                 assert simtype == "pf" or simtype == "opf"
-                # logger.debug("Added Scenario: %s" % title)
-                self.scenarios.append(Scenario(title, simtype))
+                current_scen = Scenario(title, simtype, count)
 
             # remove 
             elif line[0] == "remove":
                 if line[1] == "bus":
-                    self.scenarios[-1].kill_bus.append(int(line[2]))
+                    current_scen.kill_bus.append(int(line[2]))
                 elif line[1] == "line":
-                    self.scenarios[-1].kill_line.append(line[2])
+                    current_scen.kill_line.append(line[2])
                 elif line[1] == "generator":
-                    self.scenarios[-1].kill_gen.append(line[2])
+                    current_scen.kill_gen.append(line[2])
                 else:
                     raise Exception("got %s expected (line, generator, bus)" 
                                     % line[1])
@@ -187,24 +248,28 @@ class SimulationBatch(object):
             # set
             elif line[0] == "set":
                 if line[1:3] == ["all","demand"]:
-                    self.scenarios[-1].all_demand = float(line[3])
+                    current_scen.all_demand = float(line[3])
                 else:
                     raise Exception("got %s expected 'demand'" % line[1])
                 
             # results 
             elif line[0] == "result":
                 assert line[1] in set("pass fail error".split())
-                self.scenarios[-1].result = line[1]
+                current_scen.result = line[1]
 
             # nothing else allowed
             else:
                 raise Exception("got %s expected (remove, set, result, [])" 
                                 % line[0])
 
-        self.scenarios[-1].invariant()
+
+        if current_scen is not None:
+            # logger.debug("Added Scenario: %s" % title)
+            self.add(current_scen)
 
     def write_stats(self, stream):
-        stream.write("scenario with\t%d\titems\n" % len(self))
+
+        stream.write("batch\t%d\t%d\n" % (self.size(), len(self)))
         
         result_count = collections.defaultdict(int)
         fail_count = collections.defaultdict(int)
@@ -214,11 +279,11 @@ class SimulationBatch(object):
         gen_count = collections.defaultdict(int)
 
         for scen in self:
-            fail_count[scen.num_kills()] += 1
-            result_count[str(scen.result)] += 1
-            bus_count[len(scen.kill_bus)] += 1
-            line_count[len(scen.kill_line)] += 1
-            gen_count[len(scen.kill_gen)] += 1
+            fail_count[scen.num_kills()] += scen.count
+            result_count[str(scen.result)] += scen.count
+            bus_count[len(scen.kill_bus)] += scen.count
+            line_count[len(scen.kill_line)] += scen.count
+            gen_count[len(scen.kill_gen)] += scen.count
 
         stream.write("Failures\tOccurance\n")
         map(lambda x: stream.write("%d\t%d\n" % x), fail_count.items())
@@ -237,6 +302,9 @@ class SimulationBatch(object):
         stream.write("-"*80 + "\n")        
         
 
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
 
 
 #------------------------------------------------------------------------------
@@ -247,7 +315,7 @@ class SimulationBatch(object):
 class Test_read(ModifiedTestCase):
 
     def util_readwrite_match(self, inp):
-        sb = SimulationBatch()        
+        sb = SimulationBatch()
         sb.read(StringIO(inp))
         stream = StringIO()
         sb.write(stream)
@@ -256,6 +324,8 @@ class Test_read(ModifiedTestCase):
     def test_1(self):
         self.util_readwrite_match("""[name123] pf\n""")
         self.util_readwrite_match("""[name123] opf\n""")
+        self.util_readwrite_match("""[name123] pf 436\n""")
+        self.util_readwrite_match("""[name123] opf 243\n""")
         self.util_readwrite_match(
             """[name123] pf
   remove bus 1
@@ -278,10 +348,92 @@ class Test_read(ModifiedTestCase):
   remove generator g11
 """)
         self.util_readwrite_match(
-            """[name123] pf
+            """[name123] pf 7
   set all demand 0.86
   result fail
 """)
+
+
+class Test_add(ModifiedTestCase):
+
+    def test_001(self):
+        sb = SimulationBatch()
+
+        a = Scenario("a")
+        a.kill_bus.append(12)
+        sb.add(a)
+      
+        b = Scenario("b")
+        b.kill_bus.append(12)
+        sb.add(b)
+      
+        self.assertEqual(len(sb), 1)
+        self.assertEqual(sb.size(), 2)
+      
+    def test_002(self):
+        sb = SimulationBatch()
+
+        a = Scenario("a")
+        a.kill_bus.append(12)
+        sb.add(a)
+      
+        b = Scenario("b")
+        b.kill_bus.append(13)
+        sb.add(b)
+      
+        self.assertEqual(len(sb), 2)
+        self.assertEqual(sb.size(), 2)
+      
+    def test_003(self):
+        sb = SimulationBatch()
+
+        a = Scenario("a")
+        a.kill_bus.append(12)
+        sb.add(a)
+      
+        c = Scenario("c")
+        c.kill_bus.append(12)
+        sb.add(c)
+
+        b = Scenario("b")
+        b.kill_bus.append(13)
+        sb.add(b)
+
+        d = Scenario("d")
+        d.kill_bus.append(12)
+        sb.add(d)
+      
+        self.assertEqual(len(sb), 2)
+        self.assertEqual(sb.size(), 4)
+      
+    def test_004(self):
+        sb = SimulationBatch()
+
+        a = Scenario("a", "pf")
+        a.kill_bus.append(12)
+        sb.add(a)
+      
+        b = Scenario("b", "opf")
+        b.kill_bus.append(12)
+        sb.add(b)
+      
+        self.assertEqual(len(sb), 2)
+        self.assertEqual(sb.size(), 2)
+      
+    def test_005(self):
+        sb = SimulationBatch()
+
+        a = Scenario("a", "pf", 23)
+        a.kill_bus.append(12)
+        sb.add(a)
+      
+        b = Scenario("b", "pf", 100)
+        b.kill_bus.append(12)
+        sb.add(b)
+      
+        self.assertEqual(len(sb), 1)
+        self.assertEqual(sb.size(), 123)
+        
 
 
 #------------------------------------------------------------------------------

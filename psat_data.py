@@ -200,7 +200,6 @@ class PsatData(object):
         write_section(stream, self.supply, "Supply")
 
     def remove_bus(self, bus_no):
-        print "remove_bus", bus_no
 
         # really should be an 'assert' not an 'if' but make testing easier
         if len(self.slack) == 1:
@@ -267,13 +266,21 @@ class PsatData(object):
 
         bus_no = self.supply[supply_id].bus_no
 
+
+        # really just for testing (my god that is poor style)
+        if len(self.slack) == 0:
+            assert bus_no in self.generators, "missing generator info"
+            self.mismatch -= self.generators[bus_no].p 
+            del self.generators[bus_no]
+            del self.supply[supply_id]
+            return 
+        
         assert len(self.slack) == 1
         slack = self.slack.values()[0]
 
         if slack.bus_no == bus_no:
-            print "deleting slack bus"
-
-            # lets just hope that's accurate, it's probably not.
+            
+            # todo: lets just hope that's accurate, it's probably not.
             self.mismatch -= slack.p_guess 
 
             # del self.generators[bus_no] 
@@ -287,7 +294,7 @@ class PsatData(object):
             gen = None 
             for x in allowed_slacks:
                 if x in self.generators:
-                    print "new slack =", x
+                    print "deleting slack bus: new slack =", x
                     assert self.generators[x].bus_no == x, "%s, %s" % (self.generators[x].bus_no, x)
                     gen = self.generators[x]
                     break
@@ -316,7 +323,10 @@ class PsatData(object):
     def set_all_demand(self, value):
         # Note:: should I change P, Q or both.
 
-        assert(0 < value < 2)
+        # this doesn't really do much other than check the data type
+        # we need it that high for testing but the system wont work
+        # with value above 1.08 currently 
+        assert(0 < value <= 4)
 
         for load in self.loads.values():
             newval  = load.p * value
@@ -442,9 +452,31 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
                 return n
         return None
 
+
+    assert sum(min_limit) < sum(power) + mismatch < sum(max_limit)
+
+
+    # print "mismatch\t%f" % mismatch
+    # print "total gen\t%f" % sum(power)
+    # print "total min gen\t%f" % sum(min_limit)
+    # print "total max gen\t%f" % sum(max_limit)
+    # print "-"*10
+    # print "power\t%s" % as_csv(power,"\t")
+    # print "min_limit\t%s" % as_csv(min_limit,"\t")
+    # print "max_limit\t%s" % as_csv(max_limit,"\t")
+    # if mismatch > 0:
+    #     print as_csv([b-a for a,b in zip(power, max_limit)], "\t")
+    #     print sum(max_limit) - sum(power)
+    # else:
+    #     print as_csv([b-a for a,b in zip(power, min_limit)], "\t")
+    #     print sum(power) - sum(min_limit)
+        
+
     # deal with each generator that will be limited
     while True:
         assert(not all(done))
+
+        # print "fix_mismatch", len([1 for x in done if x])
 
         total_gen = sum(power[i] for i in range(len(done)) if not done[i])
         assert(total_gen != 0)

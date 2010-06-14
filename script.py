@@ -601,6 +601,12 @@ def example5():
              set all demand 0.5
            """
 
+    data = """
+           [fail_001] pf
+             remove generator g32
+             remove generator g13
+"""
+
     batch = SimulationBatch()
     batch.read(StringIO(data))
     psat = read_psat("rts.m")
@@ -610,7 +616,7 @@ def example5():
         print "result = '" + str(report_in_limits(report)) + "'"
 
 
-# example5()
+#example5()
 
 
 # -----------------------------------------------------------------------------
@@ -887,12 +893,13 @@ def generate_cases(n_outages, n_failures):
     
     clean_files()    
     batch_size = 100 
+    sim = True
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
 
     if n_outages:
         outage_batch = make_outages(prob, n_outages)
-        # batch_simulate(outage_batch, psat, batch_size)
+        if sim: batch_simulate(outage_batch, psat, batch_size)
 
         with open("outage.csv", "w") as result_file:
             outage_batch.csv_write(result_file)
@@ -903,7 +910,7 @@ def generate_cases(n_outages, n_failures):
 
     if n_failures:
         failure_batch = make_failures(prob, n_failures)
-        # batch_simulate(failure_batch, psat, batch_size)
+        if sim: batch_simulate(failure_batch, psat, batch_size)
 
         with open("failure.csv", "w") as result_file:
             failure_batch.csv_write(result_file)
@@ -911,7 +918,7 @@ def generate_cases(n_outages, n_failures):
         print "failure stats"
         failure_batch.write_stats(sys.stdout)
 
-generate_cases(0, 2000000)
+generate_cases(0, 10000)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):
@@ -939,18 +946,18 @@ def runme(n_outages=100, n_failures=100):
     prob = read_probabilities("rts.net")
 
     outage_batch = make_outages(prob, n_outages)
-    batch_simulate(outage_batch, psat, 30)
+    batch_simulate(outage_batch, psat, 100)
     with open("outage.bch2", "w") as result_file:
         outage_batch.write(result_file)
 
     failure_batch = make_failures(prob, n_failures)
-    batch_simulate(failure_batch, psat, 30)
+    batch_simulate(failure_batch, psat, 100)
     with open("failure.bch2", "w") as result_file:
         failure_batch.write(result_file)
 
     simulate_cases(outage_batch, failure_batch, psat)
 
-# runme(10,10)
+#runme(10,10)
 
 # -----------------------------------------------------------------------------
 

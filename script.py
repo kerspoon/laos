@@ -207,7 +207,7 @@ def text_to_scenario(text):
         batch.read(batch_stream)
 
     assert len(batch) == 1
-    return batch[0]
+    return list(batch)[0]
 
 
 def scenario_to_psat(scenario, psat):
@@ -415,6 +415,7 @@ def parse_matlab_output(text):
 
         passed = True
 
+
         if found("Warning: Matrix is singular", sim_text):
             print "singular matrix warning", n
             passed = False
@@ -423,21 +424,23 @@ def parse_matlab_output(text):
             print "near singular matrix warning", n
             passed = False
 
-        if found("The error is increasing too much", sim_text):
-            print "large error", n
-            passed = False
-
-        if found("Convergence is likely not reachable", sim_text):
-            print "non-convergence", n
-            passed = False
-
-        if not found("Power Flow completed in", sim_text):
-            print "power flow not completed", n
-            passed = False
-
         if found("IPM-OPF", sim_text):
             if not found("IPM-OPF completed in", sim_text):
                 print "opf not completed", n
+                passed = False
+
+        else:
+            # we don't cae if the PF before the OPF fails. 
+            if found("The error is increasing too much", sim_text):
+                print "large error", n
+                passed = False
+
+            if found("Convergence is likely not reachable", sim_text):
+                print "non-convergence", n
+                passed = False
+
+            if not found("Power Flow completed in", sim_text):
+                print "power flow not completed", n
                 passed = False
 
         result.append(passed)
@@ -467,7 +470,7 @@ def simulate(matlab_filename, single_item=True):
 
         so, se = proc.communicate()
      
-        if (False):
+        if (True):
             print "SE"
             print "================================="
             print se 
@@ -721,19 +724,19 @@ def test004():
     clean = False
 
     data = """
-           [notused] opf
+           [notused] pf
              #set all demand 0.5
            """
 
     scenario = text_to_scenario(data)
 
     psat = read_psat("rts.m")
-    scenario.title = "noslack"
+    scenario.title = "mod1"
     report = simulate_scenario(psat, scenario, clean)
     print "first result = '" + str(report_in_limits(report)) + "'"
 
     psat = read_psat("rts2.m")
-    scenario.title = "slack"
+    scenario.title = "mod2"
     report = simulate_scenario(psat, scenario, clean)
     print "second result = '" + str(report_in_limits(report)) + "'"
 
@@ -841,6 +844,21 @@ def test006():
         dosim("psat_b", simtype)
     # inner_test7()
 
+    def inner_text8():
+        simtype = "opf"
+        copy_psat("psat_base", "psat_a")
+        dosim("psat_a", simtype)
+        cycle("psat_a", "psat_b")   
+        dosim("psat_b", simtype) 
+        cycle("psat_b", "psat_c")   
+        dosim("psat_c", simtype) 
+        cycle("psat_c", "psat_d")   
+        dosim("psat_d", simtype) 
+        cycle("psat_d", "psat_e")   
+        dosim("psat_e", simtype) 
+        cycle("psat_e", "psat_f")   
+        dosim("psat_f", simtype) 
+
 # test006()
 
 def test007():
@@ -918,7 +936,7 @@ def generate_cases(n_outages, n_failures):
         print "failure stats"
         failure_batch.write_stats(sys.stdout)
 
-generate_cases(0, 10000)
+# generate_cases(000, 100)
 
 
 def simulate_cases(outage_batch, failure_batch, psat):

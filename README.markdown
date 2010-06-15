@@ -27,7 +27,7 @@ Files
 Bugs
 ====
 
- + slack-bus-bug - cannot kill g12
+ + failed convergens on load flow followed by passing opf. causes `error` should cause `pass`.
  + reactive-limit-bug - caused by seperating generators onto virtual busses 
                         example: (pf 0.772)
  + kill-large-gen-bug - fix_mismatch fails when large gens are killed 

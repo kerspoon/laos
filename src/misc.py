@@ -128,18 +128,18 @@ def duplicates_exist(iterable):
 
 
 def TEST_duplicates_exist():
-    assert duplicates_exist([0,1,2,3]) == False
-    assert duplicates_exist([2,1,2,3]) == True
-    assert duplicates_exist([1,1,2,3]) == True
-    assert duplicates_exist([1,1,1,1]) == True
-    assert duplicates_exist([-4,8,2,7]) == False
+    assert duplicates_exist([0, 1, 2, 3]) == False
+    assert duplicates_exist([2, 1, 2, 3]) == True
+    assert duplicates_exist([1, 1, 2, 3]) == True
+    assert duplicates_exist([1, 1, 1, 1]) == True
+    assert duplicates_exist([-4, 8, 2, 7]) == False
 # TEST_duplicates_exist()
 
 
 #------------------------------------------------------------------------------
 #  as_csv :: [T], str -> str
 #------------------------------------------------------------------------------
-def as_csv(iterable, sep = "  "):
+def as_csv(iterable, sep="  "):
     """a string of each item seperated by 'sep'"""
     return sep.join(str(x) for x in list(iterable))
 

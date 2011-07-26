@@ -80,9 +80,9 @@ integer = ToInteger(
 
 decimal = ToDecimal(
     Combine(
-        Optional(sign) +
-        Word(nums) +
-        Optional(decimal_sep + Word(nums)) +
+        Optional(sign) + 
+        Word(nums) + 
+        Optional(decimal_sep + Word(nums)) + 
         Optional(oneOf("E e") + Optional(sign) + Word(nums))
     )
 )

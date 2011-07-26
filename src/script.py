@@ -244,7 +244,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
 
     for n, group in enumerate(split_every(size, batch)):
         timer_start = time.clock()
-        print "simulating batch",  n+1, "of", int(math.ceil(len(batch) / size))+1
+        print "simulating batch", n + 1, "of", int(math.ceil(len(batch) / size)) + 1
         sys.stdout.flush()
      
         # make the matlab_script
@@ -258,7 +258,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
             try:
                 new_psat = scenario_to_psat(scenario, psat)
             except Exception as ex:
-                print "exception in scenario_to_psat", 
+                print "exception in scenario_to_psat",
                 print scenario.title, ex
                 scenario.result = "error"
                 new_psat = deepcopy(psat)
@@ -270,7 +270,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
         # run matlab 
         res = simulate(matlab_filename, False)
         assert len(res) == len(group)
-        for r,scenario in zip(res,group):
+        for r, scenario in zip(res, group):
             if not(r):
                 print "did not converge", scenario.title
                 scenario.result = "fail"
@@ -283,13 +283,13 @@ def batch_simulate(batch, psat, size=10, clean=True):
                     report = read_report(report_filename)
                     scenario.result = report_in_limits(report)
                 except Exception as ex:
-                    print "exception in parsing/checking report", 
+                    print "exception in parsing/checking report",
                     print scenario.title, ex
                     scenario.result = "error"
                 
 
         timer_end = time.clock()
-        timer_time = (timer_end-timer_start)
+        timer_time = (timer_end - timer_start)
         print "batch time of", int(math.ceil(timer_time)), "seconds"
 
     if clean:
@@ -411,7 +411,7 @@ def parse_matlab_output(text):
     
     result = []
     split_by_sim = text.split("Newton-Raphson Method for Power Flow")
-    for n,sim_text in enumerate(split_by_sim[1:]):
+    for n, sim_text in enumerate(split_by_sim[1:]):
 
         passed = True
 
@@ -502,7 +502,7 @@ def simulate(matlab_filename, single_item=True):
 #------------------------------------------------------------------------------
 
 
-def example1(n = 100):
+def example1(n=100):
     """make `n` outages, simulate them, and save the resulting batch"""
 
     psat = read_psat("rts.m")
@@ -517,7 +517,7 @@ def example1(n = 100):
 # example1()
 
 
-def example2(report_filename = "tmp.txt"):
+def example2(report_filename="tmp.txt"):
     """test a report and actually see why if fails"""
     
     with open(report_filename) as report_file:
@@ -706,7 +706,7 @@ def test003():
 
     new_psat = report_to_psat(report, psat)
 
-    with open("test_d.m","w") as new_psat_stream:
+    with open("test_d.m", "w") as new_psat_stream:
         new_psat.write(new_psat_stream)
 
     helper("test_d")
@@ -798,7 +798,7 @@ def test006():
         new_psat.generators[42].v = "1.01401"
         new_psat.generators[43].v = "1.01401"
 
-        with open(out_psat_filename + ".m","w") as new_psat_stream:
+        with open(out_psat_filename + ".m", "w") as new_psat_stream:
             new_psat.write(new_psat_stream)
 
     def copy_kill_shunt_mod(in_filename, out_psat_filename):
@@ -811,12 +811,12 @@ def test006():
         psat.generators[43].v = "1.01401"
         psat.loads[6].q = "1.299"
 
-        with open(out_psat_filename + ".m","w") as new_psat_stream:
+        with open(out_psat_filename + ".m", "w") as new_psat_stream:
             psat.write(new_psat_stream)
 
     def copy_psat(in_filename, out_filename):
         psat = read_psat(in_filename + ".m")
-        with open(out_filename + ".m","w") as psat_stream:
+        with open(out_filename + ".m", "w") as psat_stream:
             psat.write(psat_stream)
 
     # convert 'rts.m' to form for diff.
@@ -892,7 +892,7 @@ def test007():
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
-    for n,scenario in enumerate(batch):
+    for n, scenario in enumerate(batch):
         scenario.title = "single" + str(n)
         report = simulate_scenario(psat, scenario, False) 
         scenario.result = report_in_limits(report)
@@ -922,7 +922,7 @@ def generate_cases(n_outages, n_failures):
         with open("outage.csv", "w") as result_file:
             outage_batch.csv_write(result_file)
 
-        print "-"*80
+        print "-" * 80
         print "outage stats"
         outage_batch.write_stats(sys.stdout)
 

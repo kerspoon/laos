@@ -124,8 +124,8 @@ class NetworkProbability(object):
                 failrate = self.fail_rate / (24.0 * 365.0)
                 mttf = float((24.0 * 365.0) / self.fail_rate)
                 mttr = float(self.repair_rate)
-                self.pfail = 1-probability_failure(failrate)
-                self.pout = 1-probability_outage(mttf, mttr)
+                self.pfail = 1 - probability_failure(failrate)
+                self.pout = 1 - probability_outage(mttf, mttr)
             else:
                 self.pfail = 0
                 self.pout = 0
@@ -140,8 +140,8 @@ class NetworkProbability(object):
                 failrate = self.fail_rate / (24.0 * 365.0)
                 mttf = float((24.0 * 365.0) / self.fail_rate)
                 mttr = float(self.repair_rate)
-                self.pfail = 1-probability_failure(failrate)
-                self.pout = 1-probability_outage(mttf, mttr)
+                self.pfail = 1 - probability_failure(failrate)
+                self.pout = 1 - probability_outage(mttf, mttr)
             else:
                 self.pfail = 0
                 self.pout = 0
@@ -159,9 +159,9 @@ class NetworkProbability(object):
                 failrate = 1.0 / self.mttf
                 mttf = float(self.mttf)
                 mttr = float(self.mttr)
-                self.pfail = 1-probability_failure(failrate)
+                self.pfail = 1 - probability_failure(failrate)
                 # print mttf, mttr 
-                self.pout = 1-probability_outage(mttf, mttr)
+                self.pout = 1 - probability_outage(mttf, mttr)
             # print "Generator: %f %f" % (self.pfail, self.pout)
 
     class Crow(struct):
@@ -197,19 +197,19 @@ class NetworkProbability(object):
     def write(self, stream):
         stream.write("# NetworkProbability data file\n")
 
-        stream.write("# bus " + as_csv(self.Bus.entries," ") + "\n")
+        stream.write("# bus " + as_csv(self.Bus.entries, " ") + "\n")
         for bus in self.busses:
             stream.write("bus " + str(bus) + "\n")
             
-        stream.write("# line " + as_csv(self.Line.entries," ") + "\n")
+        stream.write("# line " + as_csv(self.Line.entries, " ") + "\n")
         for line in self.lines:
             stream.write("line " + str(line) + "\n")
 
-        stream.write("# generator " + as_csv(self.Generator.entries," ") + "\n")
+        stream.write("# generator " + as_csv(self.Generator.entries, " ") + "\n")
         for generator in self.generators:
             stream.write("generator " + str(generator) + "\n")
 
-        stream.write("# crow " + as_csv(self.Crow.entries," ") + "\n")
+        stream.write("# crow " + as_csv(self.Crow.entries, " ") + "\n")
         for crow in self.crows:
             stream.write("crow " + str(crow) + "\n")
 
@@ -277,7 +277,7 @@ class NetworkProbability(object):
             return sum(x) / len(x)
 
         def helper(name, mx):
-            if len(mx)== 0:
+            if len(mx) == 0:
                 print mx
             stream.write("%s\t%f\t%f\t%f\t%d\n" % (name, min(mx), max(mx), avg(mx), len(mx)))
         
@@ -387,10 +387,10 @@ def TEST_bus_level_quantise():
         fail_set_count[str(prob.failures("x").all_demand)] += 1
     
     stream = sys.stdout
-    print "-"*80
+    print "-" * 80
     map(lambda x: stream.write("%s\t%d\n" % x), out_set_count.items())
-    print "-"*80
+    print "-" * 80
     map(lambda x: stream.write("%s\t%d\n" % x), fail_set_count.items())
-    print "-"*80
+    print "-" * 80
 
 # TEST_bus_level_quantise()

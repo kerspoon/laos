@@ -116,7 +116,7 @@ class Scenario(object):
         self.invariant()
         infoline = [self.title, self.simtype, self.count, self.all_demand, self.result]
         kills = self.kill_bus + self.kill_line + self.kill_gen
-        stream.write(as_csv(infoline + kills,"\t")  + "\n")
+        stream.write(as_csv(infoline + kills, "\t") + "\n")
 
     def num_kills(self):
         return len(self.kill_bus) + len(self.kill_gen) + len(self.kill_line)
@@ -127,7 +127,7 @@ class Scenario(object):
         self.invariant()
         infoline = [self.simtype, self.all_demand]
         kills = self.kill_bus + self.kill_line + self.kill_gen
-        return as_csv(infoline + kills,"\t")
+        return as_csv(infoline + kills, "\t")
 
     def equal(self, other):
         """doesn't compare: count, result, or title"""
@@ -247,7 +247,7 @@ class SimulationBatch(object):
             
             # set
             elif line[0] == "set":
-                if line[1:3] == ["all","demand"]:
+                if line[1:3] == ["all", "demand"]:
                     current_scen.all_demand = float(line[3])
                 else:
                     raise Exception("got %s expected 'demand'" % line[1])

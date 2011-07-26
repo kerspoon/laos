@@ -18,7 +18,7 @@ class ModifiedTestCase(unittest.TestCase):
             exc_pattern = None
 
         argv = [repr(a) for a in args]\
-               + ["%s=%r" % (k,v)  for k,v in kwargs.items()]
+               + ["%s=%r" % (k, v)  for k, v in kwargs.items()]
         callsig = "%s(%s)" % (callable.__name__, ", ".join(argv))
 
         try:
@@ -53,7 +53,7 @@ class ModifiedTestCase(unittest.TestCase):
 class ReadError(Exception):
     pass
 
-def ReadAssert(cond,text=None):
+def ReadAssert(cond, text=None):
     if not cond: 
         raise ReadError(text)
 
@@ -81,13 +81,13 @@ def Generate_rnd_result(seq):
     """
 
     class Inner:
-        def __init__(self,seq):
+        def __init__(self, seq):
             for x in seq:
                 assert(x is True or x is False)
             self.seq = seq
             self.n = 0
 
-        def callme(self,probability):
+        def callme(self, probability):
             ret = self.seq[self.n]
             self.n += 1
             return ret
@@ -101,11 +101,11 @@ def Generate_rnd_sequence(seq):
     'random' numbers."""
 
     class Inner:
-        def __init__(self,seq):
+        def __init__(self, seq):
             self.seq = seq
             self.n = 0
 
-        def callme(self,probability):
+        def callme(self, probability):
             ret = self.seq[self.n] > probability
             self.n += 1
             return ret
@@ -118,11 +118,11 @@ class Test_Generate_rnd_result(ModifiedTestCase):
         seq = [x == 't' for x in list("tftftttfttftffttt")]
         rnd = Generate_rnd_result(seq)
         for x in seq:
-            self.assertEqual(rnd(.5),x)
+            self.assertEqual(rnd(.5), x)
     def test2(self):
         seq = [True]
         rnd = Generate_rnd_result(seq)
-        self.assertEqual(rnd(.5),True)
+        self.assertEqual(rnd(.5), True)
         self.assertRaisesEx(IndexError, rnd, .5, exc_args=(("list index out of range",)))
 
 class Test_Generate_rnd_sequence(ModifiedTestCase):
@@ -131,25 +131,25 @@ class Test_Generate_rnd_sequence(ModifiedTestCase):
         seq = [.5]
         rnd = Generate_rnd_sequence(seq)
         for _ in range(len(seq)):
-            self.assertEqual(rnd(.9),False)
+            self.assertEqual(rnd(.9), False)
 
     def test2(self):
         seq = [.95]
         rnd = Generate_rnd_sequence(seq)
         for _ in range(len(seq)):
-            self.assertEqual(rnd(.9),True)
+            self.assertEqual(rnd(.9), True)
 
     def test3(self):
-        seq = [x/10.0+0.1 for x in range(9)]
+        seq = [x / 10.0 + 0.1 for x in range(9)]
         rnd = Generate_rnd_sequence(seq)
         for x in seq:
-            self.assertEqual(rnd(0),True)
+            self.assertEqual(rnd(0), True)
 
     def test4(self):
-        seq = [x/10.0+0.1 for x in range(9)]
+        seq = [x / 10.0 + 0.1 for x in range(9)]
         rnd = Generate_rnd_sequence(seq)
         for x in seq:
-            self.assertEqual(rnd(1),False)
+            self.assertEqual(rnd(1), False)
 
 if __name__ == '__main__':
     unittest.main()

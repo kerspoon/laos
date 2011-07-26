@@ -63,7 +63,7 @@ def read_section(stream, classtype):
 
     items = []
 
-    for n,line in enumerate(stream):
+    for n, line in enumerate(stream):
         line = line.strip()
 
         # check if we are done 
@@ -75,7 +75,7 @@ def read_section(stream, classtype):
             continue
 
         # everything should be lowercase, we don't care about the ';'
-        cols = [x.lower() for x in line.replace(";"," ").split()]
+        cols = [x.lower() for x in line.replace(";", " ").split()]
 
         # strip comment delimiter from component ID
         # e.g. change '%a1' to 'a1' if it exists
@@ -300,19 +300,19 @@ class PsatData(object):
                     break
             assert gen, "no slacks bus"
 
-            slack.bus_no      = gen.bus_no
-            slack.s_rating    = gen.s_rating
-            slack.v_rating    = gen.v_rating
+            slack.bus_no = gen.bus_no
+            slack.s_rating = gen.s_rating
+            slack.v_rating = gen.v_rating
             slack.v_magnitude = gen.v
-            slack.ref_angle   = 0.0
-            slack.q_max       = gen.q_max
-            slack.q_min       = gen.q_min
-            slack.v_max       = gen.v_max
-            slack.v_min       = gen.v_min
-            slack.p_guess     = gen.p
-            slack.lp_coeff    = gen.lp_coeff
-            slack.ref_bus     = 1.0
-            slack.status      = gen.status
+            slack.ref_angle = 0.0
+            slack.q_max = gen.q_max
+            slack.q_min = gen.q_min
+            slack.v_max = gen.v_max
+            slack.v_min = gen.v_min
+            slack.p_guess = gen.p
+            slack.lp_coeff = gen.lp_coeff
+            slack.ref_bus = 1.0
+            slack.status = gen.status
             del self.generators[gen.bus_no]
         else:
             assert bus_no in self.generators, "missing generator info"
@@ -329,7 +329,7 @@ class PsatData(object):
         assert(0 < value <= 4)
 
         for load in self.loads.values():
-            newval  = load.p * value
+            newval = load.p * value
             self.mismatch += load.p - newval
             load.p = newval
             self.demand[load.bus_no].p_bid_max = newval
@@ -396,7 +396,7 @@ class PsatData(object):
             min_bid = sum(s.p_bid_min for s in supplies)
 
             if not (min_bid <= generator.p <= max_bid):
-                print "generator", bus_no , "power limit:", 
+                print "generator", bus_no , "power limit:",
                 print min_bid, "<=", generator.p, "<=", max_bid
                 inlimit = False
 
@@ -619,32 +619,32 @@ class Test_kill_lines(ModifiedTestCase):
 
     def test_remove_none(self):
         self.assertEqual(
-            set("a1 a2 a3 a4 a5".split()), 
+            set("a1 a2 a3 a4 a5".split()),
             set(self.pd.lines))
 
     def test_remove_first(self):
         self.pd.remove_line("a1")
         self.assertEqual(
-            set("a2 a3 a4 a5".split()), 
+            set("a2 a3 a4 a5".split()),
             set(self.pd.lines))
         
     def test_remove_last(self):
         self.pd.remove_line("a5")
         self.assertEqual(
-            set("a1 a2 a3 a4".split()), 
+            set("a1 a2 a3 a4".split()),
             set(self.pd.lines))
 
     def test_remove_middle(self):
         self.pd.remove_line("a3")
         self.assertEqual(
-            set("a1 a2 a4 a5".split()), 
+            set("a1 a2 a4 a5".split()),
             set(self.pd.lines))
 
     def test_remove_double(self):
         self.pd.remove_line("a3")
         self.pd.remove_line("a4")
         self.assertEqual(
-            set("a1 a2 a5".split()), 
+            set("a1 a2 a5".split()),
             set(self.pd.lines))
 
 
@@ -823,7 +823,7 @@ PV.con = [ ...
             set([1, 2, 3, 4]),
             set(self.pd.busses))
         self.assertEqual(
-            set("a1 a2 a3 a5".split()), 
+            set("a1 a2 a3 a5".split()),
             set(self.pd.lines))
         self.assertEqual(
             set("g1 g2 g3 g4 g5 g6 g7 g8".split()),
@@ -838,7 +838,7 @@ PV.con = [ ...
             set([2, 3, 4]),
             set(self.pd.busses))
         self.assertEqual(
-            set("a5".split()), 
+            set("a5".split()),
             set(self.pd.lines))
         self.assertEqual(
             set("g6 g7 g8".split()),
@@ -853,7 +853,7 @@ PV.con = [ ...
             set([1, 3, 4]),
             set(self.pd.busses))
         self.assertEqual(
-            set("a2 a3".split()), 
+            set("a2 a3".split()),
             set(self.pd.lines))
         self.assertEqual(
             set("g1 g2 g3 g4 g5".split()),

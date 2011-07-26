@@ -173,7 +173,7 @@ class PsatReport(object):
         bus_num = tokens["bus"][0]
 
         assert bus_num >= 0
-        assert bus_num not in self.power_flow, "already added bus "+ str(bus_num) 
+        assert bus_num not in self.power_flow, "already added bus " + str(bus_num) 
 
         self.power_flow[bus_num] = self.PowerFlow(
             bus_num,
@@ -201,13 +201,13 @@ class PsatReport(object):
         # print tokens["bus1"]
         # print tokens["bus2"]
 
-        self.ensure(dec_check(tokens["pf"], Decimal("-10.0"), Decimal("10.0")), 
+        self.ensure(dec_check(tokens["pf"], Decimal("-10.0"), Decimal("10.0")),
                     "lineflow pf error : \n%s" % tokens)
-        self.ensure(dec_check(tokens["qf"], Decimal("-10.0"), Decimal("10.0")), 
+        self.ensure(dec_check(tokens["qf"], Decimal("-10.0"), Decimal("10.0")),
                     "lineflow qf error : \n%s" % tokens)
-        self.ensure(dec_check(tokens["pl"], Decimal("0.0"), Decimal("3.0")), 
+        self.ensure(dec_check(tokens["pl"], Decimal("0.0"), Decimal("3.0")),
                     "lineflow pl error : \n%s" % tokens)
-        self.ensure(dec_check(tokens["ql"], Decimal("-3.0"), Decimal("3.0")), 
+        self.ensure(dec_check(tokens["ql"], Decimal("-3.0"), Decimal("3.0")),
                     "lineflow ql error : \n%s" % tokens)
 
         self.ensure(1 <= tokens["linenum"] <= 1000, "error : \n%s" % tokens)
@@ -228,7 +228,7 @@ class PsatReport(object):
     def process_limits(self, tokens):
         # print("Limits : %s" % tokens)
 
-        if any((tok in tokens) for tok in ["reactfail", 
+        if any((tok in tokens) for tok in ["reactfail",
                                            "voltfail",
                                            "currentfail",
                                            "reactfail"]):
@@ -294,9 +294,9 @@ class PsatReport(object):
         head1 = stringtolits("From Bus To Bus Line P Flow Q Flow P Loss Q Loss")
         head2 = stringtolits("[p.u.] [p.u.] [p.u.] [p.u.]")
 
-        busdef = (busname("bus1") +
-                  busname("bus2") +
-                  integer("linenum") +
+        busdef = (busname("bus1") + 
+                  busname("bus2") + 
+                  integer("linenum") + 
                   decimaltable("pf qf pl ql".split()))
 
         busdef = busdef.setParseAction(self.process_lineflow_bus)
@@ -341,25 +341,25 @@ class PsatReport(object):
                      slit("WITHIN LIMITS") + 
                      restOfLine.suppress())
 
-        reactfail = (slit("# OF REACTIVE POWER LIMIT VIOLATIONS:") +
+        reactfail = (slit("# OF REACTIVE POWER LIMIT VIOLATIONS:") + 
                      integer("reactfail"))
 
         react = reactfail | reactpass
         
-        currentfail = (slit("# OF CURRENT FLOW LIMIT VIOLATIONS:") +
+        currentfail = (slit("# OF CURRENT FLOW LIMIT VIOLATIONS:") + 
                        integer("currentfail"))
 
-        currentpass = (slit("ALL CURRENT FLOWS WITHIN LIMITS") +
+        currentpass = (slit("ALL CURRENT FLOWS WITHIN LIMITS") + 
                        restOfLine.suppress())
 
         current = currentpass | currentfail
 
         real = slit("ALL REAL POWER FLOWS WITHIN LIMITS") + restOfLine.suppress()
 
-        apparentfail = (slit("# OF APPARENT POWER FLOW LIMIT VIOLATIONS:") +
+        apparentfail = (slit("# OF APPARENT POWER FLOW LIMIT VIOLATIONS:") + 
                         integer("apparentfail"))
 
-        apparentpass = (slit("ALL APPARENT POWER FLOWS WITHIN LIMITS") +
+        apparentpass = (slit("ALL APPARENT POWER FLOWS WITHIN LIMITS") + 
                         restOfLine.suppress())
 
         apparent = apparentpass | apparentfail

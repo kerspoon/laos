@@ -62,11 +62,11 @@ def mockfile(text):
     return StringIO.StringIO(text)
 
 # rnd_True :: Real(0,1) -> Bool
-def rnd_True(probability):
+def rnd_True(_):
     return True
 
 # rnd_False :: Real(0,1) -> Bool
-def rnd_False(probability):
+def rnd_False(_):
     return False
 
 # rnd_random :: Real(0,1) -> Bool
@@ -87,7 +87,7 @@ def Generate_rnd_result(seq):
             self.seq = seq
             self.n = 0
 
-        def callme(self, probability):
+        def callme(self, _):
             ret = self.seq[self.n]
             self.n += 1
             return ret

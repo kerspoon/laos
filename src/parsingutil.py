@@ -28,9 +28,11 @@ Utilities for pyparsing
 # Imports:
 #------------------------------------------------------------------------------
 
-from pyparsing import *
-import string
 from decimal import Decimal
+from pyparsing import TokenConverter, oneOf, CaselessLiteral, Literal, Or, \
+    Combine, Optional, nums, Word, alphanums, sglQuotedString, dblQuotedString, And, \
+    Suppress
+import string
 
 #------------------------------------------------------------------------------
 # PyParsing Util:
@@ -93,7 +95,7 @@ qstring = (sglQuotedString | dblQuotedString)
 # don't care about having extra spaces in the literal
 stringtolits = lambda x: And([Literal(y) for y in x.split()])
 
-# a space seperated line of decimal values that have a column name
+# a space separated line of decimal values that have a column name
 decimaltable = lambda x: And([decimal.setResultsName(y) for y in x])
 
 

@@ -382,7 +382,7 @@ def TEST_bus_level_quantise():
 
     out_set_count = collections.defaultdict(int)
     fail_set_count = collections.defaultdict(int)
-    for x in range(count):
+    for _ in range(count):
         out_set_count[str(prob.outages("x").all_demand)] += 1
         fail_set_count[str(prob.failures("x").all_demand)] += 1
     

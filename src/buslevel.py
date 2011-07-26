@@ -1,7 +1,9 @@
 #! /usr/bin/env python
 
-from modifiedtestcase import *
+
 import random
+from modifiedtestcase import ModifiedTestCase
+import unittest
 
 
 # http://www.ee.washington.edu/research/pstca/rts/rts96/

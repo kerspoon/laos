@@ -32,9 +32,9 @@ Note:: doesn't fully fill in the data, but parses everything
 # Imports:
 #------------------------------------------------------------------------------
 
-
-from parsingutil import Literal, integer, Group, Optional, restOfLine, decimal
-from parsingutil import stringtolits, decimaltable, OneOrMore, ZeroOrMore, slit
+from pyparsing import Group, restOfLine, OneOrMore, ZeroOrMore
+from parsingutil import Literal, integer, Optional, decimal
+from parsingutil import stringtolits, decimaltable, slit
 from decimal import Decimal
 
 

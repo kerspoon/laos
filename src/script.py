@@ -110,7 +110,7 @@ def read_psat(filename):
        ----
        read a psat_file into PsatData.
     """
-    return read_file(filename, PsatData)
+    return read_file("../" + filename, PsatData)
 
 
 def read_batch(filename):
@@ -319,6 +319,7 @@ def single_simulate(psat, simtype, title, clean=True):
 
     # run matlab 
     res = simulate(matlab_filename)
+    # TODO: use the result
 
     # return the parsed report
     report = read_report(report_filename)
@@ -553,11 +554,11 @@ def example4():
            [example_4] opf
 remove generator g12
            """
-
-             #remove generator g33
-             #set all demand 0.7686144
-             #remove bus 6
-
+           
+    #remove generator g33
+    #set all demand 0.7686144
+    #remove bus 6
+             
     scenario = text_to_scenario(data)
     psat = read_psat("rts.m")
     report = simulate_scenario(psat, scenario, clean)
@@ -658,7 +659,7 @@ def test001():
     print "zero result = '" + str(report_in_limits(report)) + "'"
 
 
-# test001()
+#test001()
 
 
 def test002():

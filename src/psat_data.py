@@ -45,7 +45,7 @@ def write_section(stream, items, title):
         return
 
     stream.write(title + ".con = [ ... \n")
-    for key, value in sorted(items.items()):
+    for _, value in sorted(items.items()):
         if "cid" == value.entries[-1]:
             tmp = as_csv([value.__dict__[x] for x in value.entries[:-1]], " ")
             stream.write("  " + tmp + "; %" + value.cid + "\n")
@@ -63,7 +63,7 @@ def read_section(stream, classtype):
 
     items = []
 
-    for n, line in enumerate(stream):
+    for _, line in enumerate(stream):
         line = line.strip()
 
         # check if we are done 
@@ -188,7 +188,8 @@ class PsatData(object):
             passed = False
 
         # we could also make sure that the key and cid/bus_no match.
-            
+        return passed
+    
     def write(self, stream):
         write_section(stream, self.busses, "Bus")
         write_section(stream, self.lines, "Line")

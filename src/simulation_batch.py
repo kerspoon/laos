@@ -27,12 +27,12 @@ simulation_batch.py - SimulationBatch - batch_file - batch
 #  Imports:
 #------------------------------------------------------------------------------
 
-import unittest
-from modifiedtestcase import ModifiedTestCase
 from StringIO import StringIO
 from misc import as_csv
+from modifiedtestcase import ModifiedTestCase
 import collections
 import hashlib
+import unittest
 
 #------------------------------------------------------------------------------
 #  eBNF

@@ -3,6 +3,7 @@
 from modifiedtestcase import *
 import random
 
+
 # http://www.ee.washington.edu/research/pstca/rts/rts96/
 
 weekly = [86.2, 90.0, 87.8, 83.4, 88.0, 84.1, 83.2, 80.6, 74.0, 73.7, 71.5, 72.7, 70.4, 75.0, 72.1, 80.0, 75.4, 83.7, 87.0, 88.0, 85.6, 81.1, 90.0, 88.7, 89.6, 86.1, 75.5, 81.6, 80.1, 88.0, 72.2, 77.6, 80.0, 72.9, 72.6, 70.5, 78.0, 69.5, 72.4, 72.4, 74.3, 74.4, 80.0, 88.1, 88.5, 90.9, 94.0, 89.0, 94.2, 97.0, 100.0, 95.2]
@@ -148,23 +149,23 @@ def examples():
     inner(forecast_load(37, "Sunday", 5)) # probably lowest
     inner(forecast_load(50, "Tuesday", 17)) # probably highest
 
-    for x in range(3):
+    for _ in range(3):
         inner(forecast_load(random_week(),random_day(),random_hour()))
     
     print "-----"
-    act = [forecast_load(random_week(),random_day(),random_hour()) for x in range(10000)]
+    act = [forecast_load(random_week(),random_day(),random_hour()) for _ in range(10000)]
     print "Random Forecast"
     print "min =", min(act), "avg =", sum(act) / len(act), "max =", max(act), "len =", len(act) 
     print act[:20]
 
     print "-----"
-    act = [actual_load(random_week(),random_day(),random_hour()) for x in range(10000)]
+    act = [actual_load(random_week(),random_day(),random_hour()) for _ in range(10000)]
     print "Random Actual"
     print "min =", min(act), "avg =", sum(act) / len(act), "max =", max(act), "len =", len(act) 
     print act[:20]
 
     print "-----"
-    act = [actual_load2(1.0) for x in range(10000)]
+    act = [actual_load2(1.0) for _ in range(10000)]
     print "Normal Distribution"
     print "min =", min(act), "avg =", sum(act) / len(act), "max =", max(act), "len =", len(act) 
     print act[:20]

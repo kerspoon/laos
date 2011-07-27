@@ -38,6 +38,7 @@ from simulation_batch import SimulationBatch, Scenario
 from network_probability import NetworkProbability
 from psat_data import PsatData
 from psat_report import PsatReport
+import os.path
 
 
 #==============================================================================
@@ -91,7 +92,15 @@ def read_file(filename, datatype):
        ----
        read a generic file into it class 'datatype'.
     """
-    with open(filename) as thefile:
+
+    if os.path.isfile(filename):
+        newfilename = filename
+    elif os.path.isfile("../" + filename):
+        newfilename = "../" + filename
+    else:
+        print "error finding file '%s'" % filename
+        
+    with open(newfilename) as thefile:
         data = datatype()
         data.read(thefile)
         return data
@@ -110,7 +119,7 @@ def read_psat(filename):
        ----
        read a psat_file into PsatData.
     """
-    return read_file("../" + filename, PsatData)
+    return read_file(filename, PsatData)
 
 
 def read_batch(filename):
@@ -239,7 +248,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
        of size `size`. Modify `batch` in place. delete all temp files
        if it succedes 
 
-       Todo:: simulate can throw so we want each batch in a try/except block
+       TODO: simulate can throw so we want each batch in a try/except block
     """
 
     for n, group in enumerate(split_every(size, batch)):
@@ -319,7 +328,7 @@ def single_simulate(psat, simtype, title, clean=True):
 
     # run matlab 
     res = simulate(matlab_filename)
-    # TODO: use the result
+    assert(res == [True])
 
     # return the parsed report
     report = read_report(report_filename)
@@ -451,11 +460,9 @@ def parse_matlab_output(text):
 
 
 def simulate(matlab_filename, single_item=True):
-    """func simulate             :: Str -> Bool
+    """func simulate             :: Str -> [Bool]
        ----
        call matlab with the specified script.
-       TODO:: parse the so for errors! 
-       TODO:: do something with the return value or exception
     """
 
     try:
@@ -487,8 +494,8 @@ def simulate(matlab_filename, single_item=True):
         assert len(result) >= 1, str(result)
 
         if single_item:
-            print result
             assert len(result) == 1
+            print result[0]
             if not(result):
                 print "did not converge (in simulate)"
 
@@ -515,7 +522,7 @@ def example1(n=100):
     with open("rts.bch", "w") as result_file:
         batch.write(result_file)
 
-# example1()
+example1()
 
 
 def example2(report_filename="tmp.txt"):
@@ -698,7 +705,8 @@ def test003():
         matlab_filename = "matlab_" + title
         psat_filename = title + ".m"
         single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
-        simulate(matlab_filename)
+        res = simulate(matlab_filename)
+        assert(res == [True])
 
     helper("rts")
 

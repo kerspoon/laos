@@ -1,7 +1,7 @@
 #! /usr/local/bin/python
 # Utilities for pyparsing
 
-#------------------------------------------------------------------------------
+#==============================================================================
 # Copyright (C) 2009 James Brooks (kerspoon)
 #
 # This program is free software; you can redistribute it and/or modify
@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
-#------------------------------------------------------------------------------
+#==============================================================================
 
 """ Package info:
 James Brooks (kerspoon)
@@ -24,9 +24,9 @@ James Brooks (kerspoon)
 Utilities for pyparsing
 """
 
-#------------------------------------------------------------------------------
+#==============================================================================
 # Imports:
-#------------------------------------------------------------------------------
+#==============================================================================
 
 from decimal import Decimal
 from pyparsing import TokenConverter, oneOf, CaselessLiteral, Literal, Or, \
@@ -34,14 +34,14 @@ from pyparsing import TokenConverter, oneOf, CaselessLiteral, Literal, Or, \
     Suppress
 import string
 
-#------------------------------------------------------------------------------
+#==============================================================================
 # PyParsing Util:
-#------------------------------------------------------------------------------
+#==============================================================================
 
 class ToBoolean(TokenConverter):
     """ Converter to make token boolean """
 
-    def postParse(self, _, _, tokenlist):
+    def postParse(self, _, _2, tokenlist):
         """ Converts the first token to boolean """
         tok = string.lower(tokenlist[0])
         if tok in ["t", "true", "1"]:
@@ -54,7 +54,7 @@ class ToBoolean(TokenConverter):
 class ToInteger(TokenConverter):
     """ Converter to make token into an integer """
 
-    def postParse(self, _, _, tokenlist):
+    def postParse(self, _, _2, tokenlist):
         """ Converts the first token to an integer """
 
         return int(tokenlist[0])
@@ -62,7 +62,7 @@ class ToInteger(TokenConverter):
 class ToDecimal(TokenConverter):
     """ Converter to make token into a float """
 
-    def postParse(self, _, _, tokenlist):
+    def postParse(self, _, _2, tokenlist):
         """ Converts the first token into a float """
 
         return Decimal(tokenlist[0])

@@ -41,7 +41,7 @@ import string
 class ToBoolean(TokenConverter):
     """ Converter to make token boolean """
 
-    def postParse(self, instring, loc, tokenlist):
+    def postParse(self, _, _, tokenlist):
         """ Converts the first token to boolean """
         tok = string.lower(tokenlist[0])
         if tok in ["t", "true", "1"]:
@@ -54,7 +54,7 @@ class ToBoolean(TokenConverter):
 class ToInteger(TokenConverter):
     """ Converter to make token into an integer """
 
-    def postParse(self, instring, loc, tokenlist):
+    def postParse(self, _, _, tokenlist):
         """ Converts the first token to an integer """
 
         return int(tokenlist[0])
@@ -62,7 +62,7 @@ class ToInteger(TokenConverter):
 class ToDecimal(TokenConverter):
     """ Converter to make token into a float """
 
-    def postParse(self, instring, loc, tokenlist):
+    def postParse(self, _, _, tokenlist):
         """ Converts the first token into a float """
 
         return Decimal(tokenlist[0])

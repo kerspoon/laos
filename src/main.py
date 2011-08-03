@@ -5,6 +5,7 @@ Created on 27 Jul 2011
 '''
 
 from script import *
+from simulation_batch import Scenario
 
 def example1(n=100):
     """make `n` outages, simulate them, and save the resulting batch"""
@@ -412,75 +413,86 @@ def test007():
 
 # -----------------------------------------------------------------------------
 
-def generate_cases(n_outages, n_failures):
+def simulate_cases(outage_batch, failure_batch, psat):
+    clean_files()
+
+    for scenario in outage_batch:
+        try:
+            report = simulate_scenario(psat, scenario, False)
+            scenario_psat = report_to_psat(report, psat)
+            clean_files()
+
+            for x in failure_batch:
+                x.result = None
+
+                batch_simulate(failure_batch, scenario_psat, 30)
+
+            filename = scenario.title + ".bch2"
+            with open(filename, "w") as result_file:
+                failure_batch.write(result_file)
+        except AssertionError as exce:
+            assert exce.message == "new file is invalid. It hits static limits."
+            
+def generate_cases(n_outages=10, n_failures=1000):
     
     clean_files()    
     batch_size = 100 
     sim = True
+    full_sim = False
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
 
+    timer_start = time.clock()
+    
+    print "[!] start simulation."
+    # create the base cases by sampling for outages 
+    # simulate these and print to a file.
+    # it should contain `n_outages` outages.
     if n_outages:
-        outage_batch = make_outages(prob, n_outages)
+        outage_batch = make_outage_cases(prob, n_outages)
         if sim: batch_simulate(outage_batch, psat, batch_size)
 
-        with open("outage.csv", "w") as result_file:
+        with open("outage.txt", "w") as result_file:
             outage_batch.csv_write(result_file)
 
         print "-" * 80
         print "outage stats"
         outage_batch.write_stats(sys.stdout)
 
+        timer_end = time.clock()
+        timer_time = (timer_end - timer_start)
+        print "[!] outages created in %d seconds." % int(math.ceil(timer_time))
+        timer_start = time.clock()
+    
+    # do the same for one hour changes to the system.
     if n_failures:
-        failure_batch = make_failures(prob, n_failures)
+        failure_batch = make_failure_cases(prob, n_failures)
         if sim: batch_simulate(failure_batch, psat, batch_size)
 
-        with open("failure.csv", "w") as result_file:
+        with open("failure.txt", "w") as result_file:
             failure_batch.csv_write(result_file)
 
         print "failure stats"
         failure_batch.write_stats(sys.stdout)
 
-# generate_cases(000, 100)
+        timer_end = time.clock()
+        timer_time = (timer_end - timer_start)
+        print "[!] failures created in %d seconds." % int(math.ceil(timer_time))
+        timer_start = time.clock()
 
-
-def simulate_cases(outage_batch, failure_batch, psat):
-    clean_files()
-
-    for scenario in outage_batch:
-        report = simulate_scenario(psat, scenario, False)
-        scenario_psat = report_to_psat(report, psat)
-        clean_files()
-
-        for x in failure_batch:
-            x.result = None
-
-        batch_simulate(failure_batch, scenario_psat, 30)
-
-        filename = scenario.title + ".bch2"
-        with open(filename, "w") as result_file:
-            failure_batch.write(result_file)
+    # simulate each of the changes to each base case
+    if full_sim: 
+        assert n_outages and n_failures
         
+        simulate_cases(outage_batch, failure_batch, psat)
+    
+        timer_end = time.clock()
+        timer_time = (timer_end - timer_start)
+        print "[!] full sim  in %d seconds." % int(math.ceil(timer_time))
+        timer_start = time.clock()
+    
+generate_cases(1000, 1000)
 
-def runme(n_outages=100, n_failures=100):
-
-    clean_files()    
-    psat = read_psat("rts.m")
-    prob = read_probabilities("rts.net")
-
-    outage_batch = make_outages(prob, n_outages)
-    batch_simulate(outage_batch, psat, 100)
-    with open("outage.bch2", "w") as result_file:
-        outage_batch.write(result_file)
-
-    failure_batch = make_failures(prob, n_failures)
-    batch_simulate(failure_batch, psat, 100)
-    with open("failure.bch2", "w") as result_file:
-        failure_batch.write(result_file)
-
-    simulate_cases(outage_batch, failure_batch, psat)
-
-#runme(10,10)
 
 # -----------------------------------------------------------------------------
 

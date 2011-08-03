@@ -34,7 +34,7 @@ import time
 from StringIO import StringIO
 from contextlib import closing
 
-from simulation_batch import SimulationBatch, Scenario
+from simulation_batch import SimulationBatch
 from network_probability import NetworkProbability
 from psat_data import PsatData
 from psat_report import PsatReport
@@ -84,6 +84,40 @@ def make_failures(prob, count):
     for x in range(count):
         batch.add(prob.failures(str(x)))
     assert count == batch.size()
+    return batch
+
+
+def make_outage_cases(prob, count):
+    """func make_outage_cases         :: NetworkProbability, Int -> SimulationBatch
+       ----
+       like `make_outages` but makes `count` *after* reducing.
+       
+       Monte Carlo sample the network for it's expected condition. 
+       e.g. existing outages, weather & load forcast, etc.
+    """
+    batch = SimulationBatch()
+    current = 0
+    while len(batch) < count:
+        batch.add(prob.outages(str(current)))
+        current += 1
+    assert count == len(batch)
+    return batch
+
+def make_failure_cases(prob, count):
+       
+    """func make_failure_cases        :: NetworkProbability, Int -> SimulationBatch
+       ----
+       like `make_failures` but makes `count` *after* reducing.
+       
+       Monte Carlo sample the network for unexpected changes. 
+       e.g. new outages (failures), actual weather, actual load level, etc.
+    """
+    batch = SimulationBatch()
+    current = 0
+    while len(batch) < count:
+        batch.add(prob.failures(str(current)))
+        current += 1
+    assert count == len(batch)
     return batch
 
 
@@ -199,8 +233,11 @@ def report_to_psat(report, psat):
     # assert len(new_psat.shunts) == 0
     # assert new_psat.loads[6].q == "1.299"
 
-    assert new_psat.in_limits()
-
+    if not new_psat.in_limits():
+        print "not in limits"
+         
+    assert new_psat.in_limits(), "new file is invalid. It hits static limits."
+    
     return new_psat
 
 
@@ -251,6 +288,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
        TODO: simulate can throw so we want each batch in a try/except block
     """
 
+    print "batch simulate %d cases" % len(batch)
     for n, group in enumerate(split_every(size, batch)):
         timer_start = time.clock()
         print "simulating batch", n + 1, "of", int(math.ceil(len(batch) / size)) + 1

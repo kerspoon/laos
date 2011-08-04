@@ -106,7 +106,7 @@ class PsatReport(object):
 
     def ensure(self, cond, text):
         if not cond:
-            print "FAIL!!!\t", text
+            # print "FAIL!!!\t", text
             self.acceptable = False
 
     def process_header_title(self, tokens):

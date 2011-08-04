@@ -413,41 +413,51 @@ def test007():
 
 # -----------------------------------------------------------------------------
 
-def simulate_cases(outage_batch, failure_batch, psat):
+def simulate_cases(outage_batch, failure_batch, psat, summary_file):
     clean_files()
 
-    for scenario in outage_batch:
+    print "[4] simulate %d unique states with %d unique contingencies" % (len(outage_batch), len(failure_batch))
+    
+    for n, scenario in enumerate(outage_batch):
         try:
+            print "[5] simulating state", n + 1, "of", int(math.ceil(len(outage_batch)))
             report = simulate_scenario(psat, scenario, False)
             scenario_psat = report_to_psat(report, psat)
             clean_files()
+            print "[6] simulating state - prep done."
 
             for x in failure_batch:
                 x.result = None
 
-                batch_simulate(failure_batch, scenario_psat, 30)
+            batch_simulate(failure_batch, scenario_psat, 100)
 
-            filename = scenario.title + ".bch2"
+            filename = scenario.title + ".txt"
             with open(filename, "w") as result_file:
-                failure_batch.write(result_file)
-        except AssertionError as exce:
-            assert exce.message == "new file is invalid. It hits static limits."
+                failure_batch.csv_write(result_file)
             
-def generate_cases(n_outages=10, n_failures=1000):
+            failure_batch.write_stats(summary_file)
+            print "[7] simulating state", n + 1, "done"
+        except AssertionError as exce:
+            if str(exce) != "new file is invalid. It hits static limits.":
+                raise exce
+            
+def generate_cases(n_outages=10, n_failures=1000,sim = True, full_sim = True):
     
     clean_files()    
     batch_size = 100 
-    sim = True
-    full_sim = False
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
 
-    timer_start = time.clock()
+    timer_begin = time.clock()
+    timer_start = timer_begin
     
     print "[!] start simulation."
     # create the base cases by sampling for outages 
     # simulate these and print to a file.
     # it should contain `n_outages` outages.
+    
+    summary_file = open("summary.txt", "w")
+
     if n_outages:
         outage_batch = make_outage_cases(prob, n_outages)
         if sim: batch_simulate(outage_batch, psat, batch_size)
@@ -458,6 +468,7 @@ def generate_cases(n_outages=10, n_failures=1000):
         print "-" * 80
         print "outage stats"
         outage_batch.write_stats(sys.stdout)
+        outage_batch.write_stats(summary_file)
 
         timer_end = time.clock()
         timer_time = (timer_end - timer_start)
@@ -474,6 +485,7 @@ def generate_cases(n_outages=10, n_failures=1000):
 
         print "failure stats"
         failure_batch.write_stats(sys.stdout)
+        failure_batch.write_stats(summary_file)
 
         timer_end = time.clock()
         timer_time = (timer_end - timer_start)
@@ -482,16 +494,20 @@ def generate_cases(n_outages=10, n_failures=1000):
 
     # simulate each of the changes to each base case
     if full_sim: 
-        assert n_outages and n_failures
+        assert n_outages and n_failures and sim
         
-        simulate_cases(outage_batch, failure_batch, psat)
+        simulate_cases(outage_batch, failure_batch, psat, summary_file)
     
         timer_end = time.clock()
         timer_time = (timer_end - timer_start)
         print "[!] full sim  in %d seconds." % int(math.ceil(timer_time))
         timer_start = time.clock()
+        
+    timer_end = time.clock()
+    timer_time = (timer_end - timer_begin)
+    print "[!] total time %d seconds." % int(math.ceil(timer_time))
     
-generate_cases(1000, 1000)
+generate_cases(2, 101, True, True)
 
 
 # -----------------------------------------------------------------------------

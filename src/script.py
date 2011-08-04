@@ -235,8 +235,8 @@ def report_to_psat(report, psat):
 
     if not new_psat.in_limits():
         print "not in limits"
-         
-    assert new_psat.in_limits(), "new file is invalid. It hits static limits."
+        # TODO: I think it probably should raise... maybe
+        # raise Exception("new file is invalid. It hits static limits.")
     
     return new_psat
 
@@ -288,10 +288,10 @@ def batch_simulate(batch, psat, size=10, clean=True):
        TODO: simulate can throw so we want each batch in a try/except block
     """
 
-    print "batch simulate %d cases" % len(batch)
+    print "[b] batch simulate %d cases" % len(batch)
     for n, group in enumerate(split_every(size, batch)):
         timer_start = time.clock()
-        print "simulating batch", n + 1, "of", int(math.ceil(len(batch) / size)) + 1
+        print "[b] simulating batch", n + 1, "of", int(math.ceil(len(batch) / size)) + 1
         sys.stdout.flush()
      
         # make the matlab_script
@@ -305,7 +305,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
             try:
                 new_psat = scenario_to_psat(scenario, psat)
             except Exception as ex:
-                print "exception in scenario_to_psat",
+                print "[b] exception in scenario_to_psat",
                 print scenario.title, ex
                 scenario.result = "error"
                 new_psat = deepcopy(psat)
@@ -319,7 +319,7 @@ def batch_simulate(batch, psat, size=10, clean=True):
         assert len(res) == len(group)
         for r, scenario in zip(res, group):
             if not(r):
-                print "did not converge", scenario.title
+                print "[b] did not converge", scenario.title
                 scenario.result = "fail"
         
         # gather results
@@ -330,14 +330,14 @@ def batch_simulate(batch, psat, size=10, clean=True):
                     report = read_report(report_filename)
                     scenario.result = report_in_limits(report)
                 except Exception as ex:
-                    print "exception in parsing/checking report",
+                    print "[b] exception in parsing/checking report",
                     print scenario.title, ex
                     scenario.result = "error"
                 
 
         timer_end = time.clock()
         timer_time = (timer_end - timer_start)
-        print "batch time of", int(math.ceil(timer_time)), "seconds"
+        print "[b] batch time of", int(math.ceil(timer_time)), "seconds"
 
     if clean:
         clean_files()
@@ -421,7 +421,6 @@ def batch_matlab_script(filename, batch):
        in the batch assuming their filename is 
            "psat_" + scenario.title + ".m"
     """
-
 
     assert len(batch) != 0
     with open(filename, "w") as matlab_stream:

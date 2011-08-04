@@ -27,7 +27,7 @@ Files
 Bugs
 ====
 
- + failed convergens on load flow followed by passing opf. causes `error` should cause `pass`.
+ + failed convergences on load flow followed by passing opf. causes `error` should cause `pass`.
  + reactive-limit-bug - caused by seperating generators onto virtual busses 
                         example: (pf 0.772)
  + kill-large-gen-bug - fix_mismatch fails when large gens are killed 
@@ -37,17 +37,25 @@ Bugs
 
  + Re-run tests (again) as *both* opf and pf.
 
-
 To Do
 ====
 
+ - Make simulate_cases and generate_cases report the summary to a summary file with section headers.
+ - generate_cases(10 by 1000)
+ - make report on why things fail and pass 
+ - show to rod
+
+
+Things that should be done
+
  - FIX BUGS
  - look into using a distributed slack bus.
- - quantize the continious data such as load forecast
  - memoize results considering that loss of either unit on a bus is the same 
    action as long as they are identical units.
  - do unit commitment as well as OPF
  - run N-1 test
+ 
+ 
 
 
 File Types

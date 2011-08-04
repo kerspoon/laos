@@ -3,6 +3,7 @@ import unittest
 import StringIO
 import random
 import sys
+from misc import Ensure
 
 class ModifiedTestCase(unittest.TestCase):
     def assertRaisesEx(self, exception, callable, *args, **kwargs):
@@ -76,14 +77,14 @@ def rnd_random(probability):
 # Generate_rnd_result :: [Bool] -> (Real(0,1) -> Bool)
 def Generate_rnd_result(seq):
     """
-    returns the sequence of Bools passes in to it
+    returns the sequence of Bools passed in to it
     regardless of the probability each time.
     """
 
     class Inner:
         def __init__(self, seq):
             for x in seq:
-                assert(x is True or x is False)
+                Ensure(x is True or x is False, "expected Boolena got %s" % str(x))
             self.seq = seq
             self.n = 0
 
@@ -154,6 +155,3 @@ class Test_Generate_rnd_sequence(ModifiedTestCase):
 if __name__ == '__main__':
     unittest.main()
 
-    
-print 
-[random.random() for aaax in range(10)]

@@ -27,7 +27,7 @@ network_probability.py NetworkProbability - prob_file - prob
 #  Imports:
 #==============================================================================
 
-from misc import struct, read_struct, as_csv
+from misc import struct, read_struct, as_csv, Ensure, Error
 import random
 import math
 import sys
@@ -78,10 +78,10 @@ def probability_failure(failrate):
     # probability_failure :: real(>0) -> real(0,1)
     """returns the probability of a component 
     failing given the failure rate"""
-    assert(failrate >= 0), "failrate: " + str(failrate)
+    Ensure(failrate >= 0, "failrate: " + str(failrate))
     time = 1.0
     res = math.exp(-failrate * time)
-    assert(0 <= res <= 1), "probability: " + str(res)
+    Ensure(0 <= res <= 1, "probability: " + str(res))
     return res
 
 
@@ -90,10 +90,10 @@ def probability_outage(mttf, mttr):
     """returns the probability of a component 
     being on outage given the mean time to fail
     and restore"""
-    assert(mttf >= 0), "mttf: " + str(mttf)
-    assert(mttr >= 0), "failratemttr: " + str(mttr)
+    Ensure(mttf >= 0, "mttf: " + str(mttf))
+    Ensure(mttr >= 0, "failratemttr: " + str(mttr))
     res = mttf / (mttf + mttr)
-    assert(0 <= res <= 1), "probability: " + str(res)
+    Ensure(0 <= res <= 1, "probability: " + str(res))
     return res
 
 
@@ -192,7 +192,7 @@ class NetworkProbability(object):
             elif cols[0] == "crow":
                 self.crows.append(read_struct(self.Crow, cols[1:]))
             else:
-                raise Exception("expected (bus, line, generator, crow) got " + cols[0])
+                raise Error("expected (bus, line, generator, crow) got " + cols[0])
 
     def write(self, stream):
         stream.write("# NetworkProbability data file\n")
@@ -256,10 +256,10 @@ class NetworkProbability(object):
 
     def write_stats(self, stream):
         
-        assert len(self.busses)
-        assert len(self.lines)
-        assert len(self.generators)
-        assert len(self.crows)
+        Ensure(len(self.busses), "There must be more than one bus. Got %d" % len(self.busses))
+        Ensure(len(self.lines), "There must be more than one line. Got %d" % len(self.lines))
+        Ensure(len(self.generators), "There must be more than one generator. Got %d" % len(self.generators))
+        Ensure(len(self.crows), "There must be more than one crow. Got %d" % len(self.crows))
 
         bus_pout = [x.pout for x in self.busses]
         bus_pfail = [x.pfail for x in self.busses]
@@ -278,7 +278,7 @@ class NetworkProbability(object):
 
         def helper(name, mx):
             if len(mx) == 0:
-                print mx
+                stream.write("%s\t\t\t\t\n" % (name))
             stream.write("%s\t%f\t%f\t%f\t%d\n" % (name, min(mx), max(mx), avg(mx), len(mx)))
         
         stream.write("name\tmin\tmax\tavg\tlen\n")

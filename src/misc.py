@@ -1,4 +1,5 @@
 #! /usr/local/bin/python
+
  
 #==============================================================================
 # Copyright (C) 2009 James Brooks (kerspoon)
@@ -28,10 +29,11 @@ Misc utilities.
 #==============================================================================
 
 import sys
-import os
 import re 
+import os
 import logging
 import itertools
+import traceback
 from collections import defaultdict
 
 #==============================================================================
@@ -174,10 +176,10 @@ class struct(object):
            if we have self.types convert all entries to correct type
         """
 
-        assert "entries" in dir(self)
+        EnsureIn("entries", dir(self), "structs must have `entries`")
 
         if "types" in dir(self):
-            assert(len(self.entries) == len(self.types))
+            EnsureEqual(len(self.entries), len(self.types))
 
         if tokens:
             self.dict_fill(tokens)
@@ -215,20 +217,21 @@ class struct(object):
             elif self.typemap[member] == "str":
                 self.__dict__[member] = str(self.__dict__[member])
             else:
-                raise Exception("bad datatype. expected (int, real, bool, str) got " + 
+                raise Error("bad datatype. expected (int, real, bool, str) got " + 
                                 self.typemap[member])
 
     def check_entries(self):
         """make sure that all the entries are added"""
         for member in self.entries:
-            assert member in dir(self), str(member) + " not added"
+            EnsureIn(member, dir(self), "entry not added")
 
 def read_struct(class_type, cols):
     """read a list of strings as the data for 'class_type'
        e.g. read_struct(Bus, "101 0.025 13".split())
        This should return a Bus with all data filled in.
     """
-    assert len(class_type.entries) == len(cols), "incomplete info. got " + str(cols)
+    EnsureEqual(len(class_type.entries), len(cols), "incomplete info. got " + str(cols))
+    
     return class_type(dict(zip(class_type.entries, cols)))
 
 def TEST_struct():
@@ -281,3 +284,62 @@ def TEST_round_to():
     assert round_to(5, 5.1) == 5
     assert round_to(5, 10) == 10
 # TEST_round_to()
+
+
+
+#==============================================================================
+#  Exceptions
+#==============================================================================
+
+class Error(Exception):
+    """Base class for exceptions in this module.
+
+    Attributes:
+        msg         -- explanation of the error
+
+    http://stackoverflow.com/questions/894088/how-do-i-get-the-current-file-current-class-and-current-method-with-python
+    http://docs.python.org/library/sys.html
+    http://docs.python.org/library/traceback.html
+    http://www.doughellmann.com/PyMOTW/traceback/
+    http://benjamin-schweizer.de/improved-python-traceback-module.html
+    """
+
+    def __init__(self, msg, use_stack_n= -1):
+        self.msg = msg
+        self.stack_n = use_stack_n
+
+    def __str__(self):
+        _exc_type, _exc_value, exc_traceback = sys.exc_info() 
+        stack = traceback.extract_tb(exc_traceback) # ==> [(filename, line number, function name, text)]
+        file = os.path.basename(stack[self.stack_n][0]).split('.')[0]
+        func = stack[self.stack_n][2]
+        line = stack[self.stack_n][1]
+        return "[E] Error: '%s' (%s.%s[%d])" % (self.msg, file, func, line)
+
+def Ensure(cond, msg):
+    if not cond:
+        raise Error(msg, -2)
+
+def EnsureEqual(first, second, msg=""):
+    if first != second:
+        raise Error("Expected '%s' = '%s' %s" % (str(first), str(second), msg), -2)
+    
+def EnsureNotEqual(first, second, msg=""):
+    if first == second:
+        raise Error("Expected '%s' = '%s' %s" % (str(first), str(second), msg), -2)
+
+def EnsureIn(first, second, msg=""):
+    if first not in second:
+        raise Error("Expected '%s' in '%s' %s" % (str(first), str(second), msg), -2)
+
+def TEST_EnsureEqual():
+    def lumberjack():
+        bright_side_of_death()
+
+    def bright_side_of_death():
+        EnsureEqual(3, 5)
+        
+    try:
+        lumberjack()
+    except Exception as exc:
+        print exc

@@ -27,7 +27,8 @@ psat_data.py - PsatData - psat_file - psat
 #  Imports:
 #==============================================================================
 
-from misc import struct, read_struct, as_csv, duplicates_exist
+from misc import struct, read_struct, as_csv, duplicates_exist, EnsureEqual, \
+    Ensure, EnsureNotEqual, EnsureIn, Error
 import re
 import unittest
 from StringIO import StringIO
@@ -143,16 +144,16 @@ class PsatData(object):
             return line.startswith(title)
      
         def read_as_cid(storage, classtype):
-            assert len(storage) == 0
+            EnsureEqual(len(storage), 0)
             for item in read_section(stream, classtype):
                 storage[item.cid] = item
-            assert len(storage) >= 0
+            Ensure(len(storage) >= 0, "failed to read any items")
      
         def read_as_bus_no(storage, classtype):
-            assert len(storage) == 0
+            EnsureEqual(len(storage), 0)
             for item in read_section(stream, classtype):
                 storage[item.bus_no] = item
-            assert len(storage) >= 0
+            Ensure(len(storage) >= 0, "failed to read any items")
             
         for line in stream:
             line = line.strip()
@@ -176,7 +177,7 @@ class PsatData(object):
             elif title_matches(line, "Demand.con"):
                 read_as_bus_no(self.demand, self.Demand)
             else:
-                raise Exception("expected matlab section, got '" + line + "'")
+                raise Error("expected matlab section, got '" + line + "'")
 
         self.invariant()
 
@@ -202,13 +203,13 @@ class PsatData(object):
 
     def remove_bus(self, bus_no):
 
-        # really should be an 'assert' not an 'if' but make testing easier
+        # TODO: really should be an 'assert' not an 'if' but make testing easier
         if len(self.slack) == 1:
             slack = self.slack.values()[0]
-            assert slack.bus_no != bus_no
+            EnsureNotEqual(slack.bus_no, bus_no)
  
 
-        assert self.busses[bus_no].bus_no == bus_no
+        EnsureEqual(self.busses[bus_no].bus_no, bus_no)
         del self.busses[bus_no]
 
         # as we now have virtal busses that connect to generators
@@ -270,13 +271,13 @@ class PsatData(object):
 
         # really just for testing (my god that is poor style)
         if len(self.slack) == 0:
-            assert bus_no in self.generators, "missing generator info"
+            Ensure(bus_no in self.generators, "missing generator info (%s)" % bus_no)
             self.mismatch -= self.generators[bus_no].p 
             del self.generators[bus_no]
             del self.supply[supply_id]
             return 
         
-        assert len(self.slack) == 1
+        EnsureEqual(len(self.slack), 1)
         slack = self.slack.values()[0]
 
         if slack.bus_no == bus_no:
@@ -295,11 +296,11 @@ class PsatData(object):
             gen = None 
             for x in allowed_slacks:
                 if x in self.generators:
-                    print "deleting slack bus: new slack =", x
-                    assert self.generators[x].bus_no == x, "%s, %s" % (self.generators[x].bus_no, x)
+                    # print "deleting slack bus: new slack =", x
+                    EnsureEqual(self.generators[x].bus_no, x, "%s, %s" % (self.generators[x].bus_no, x))
                     gen = self.generators[x]
                     break
-            assert gen, "no slacks bus"
+            Ensure(gen, "no slack bus")
 
             slack.bus_no = gen.bus_no
             slack.s_rating = gen.s_rating
@@ -316,7 +317,7 @@ class PsatData(object):
             slack.status = gen.status
             del self.generators[gen.bus_no]
         else:
-            assert bus_no in self.generators, "missing generator info"
+            EnsureIn(bus_no, self.generators, "missing generator info")
             self.mismatch -= self.generators[bus_no].p 
             del self.generators[bus_no]
             del self.supply[supply_id]
@@ -327,7 +328,7 @@ class PsatData(object):
         # this doesn't really do much other than check the data type
         # we need it that high for testing but the system wont work
         # with value above 1.08 currently 
-        assert(0 < value <= 4)
+        Ensure(0 < value <= 4, "just a vague sanity check")
 
         for load in self.loads.values():
             newval = load.p * value
@@ -351,7 +352,7 @@ class PsatData(object):
         """
 
         if self.mismatch == 0:
-            assert(self.in_limits())
+            Ensure(self.in_limits(), "fixing mismatch should leave it in limit")
             return
 
         scheduleable_generators = self.generators.values()
@@ -378,7 +379,7 @@ class PsatData(object):
         for newp, generator in zip(res, scheduleable_generators):
             generator.p = newp
 
-        assert(self.in_limits())
+        Ensure(self.in_limits(), "fixing mismatch should leave it in limit")
     
     def in_limits(self):
         """
@@ -429,7 +430,8 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
     Returns a list of new generator powers
     """
 
-    assert(len(power) == len(min_limit) == len(max_limit))
+    EnsureEqual(len(power), len(min_limit))
+    EnsureEqual(len(power), len(max_limit))
 
     if mismatch == 0:
         return power
@@ -453,9 +455,7 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
                 return n
         return None
 
-
-    assert sum(min_limit) < sum(power) + mismatch < sum(max_limit)
-
+    Ensure(sum(min_limit) < sum(power) + mismatch < sum(max_limit), "We cannot fix a mismatch (of %f) that is outside limits" % mismatch)
 
     # print "mismatch\t%f" % mismatch
     # print "total gen\t%f" % sum(power)
@@ -475,18 +475,18 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
 
     # deal with each generator that will be limited
     while True:
-        assert(not all(done))
+        Ensure(not all(done), "programmer error")
 
         # print "fix_mismatch", len([1 for x in done if x])
 
         total_gen = sum(power[i] for i in range(len(done)) if not done[i])
-        assert(total_gen != 0)
+        EnsureNotEqual(total_gen, 0)
         
         multiplier = 1.0 + (mismatch / total_gen)
 
         # we shouldn't really care about the miltiplier as long as 
         # the limits are being met should we?
-        assert(0 <= multiplier <= 5)
+        Ensure(0 <= multiplier <= 5, "vague sanity check")
 
         if mismatch < 0:
             idx_gen = find_limit_min(multiplier)
@@ -518,9 +518,9 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
   
     # check nothing is out of limits 
     for idx in range(len(power)):
-        assert(min_limit[idx] <= power[idx] <= max_limit[idx])
-    assert mismatch < 0.001
-    assert all(done)
+        Ensure(min_limit[idx] <= power[idx] <= max_limit[idx], "Power (%f) out of limit (%f<=%f<=%f)" % (idx, min_limit[idx], power[idx], max_limit[idx]))
+    Ensure(mismatch < 0.001, "should be much mismatch left after fixing it")
+    Ensure(all(done), "should have fixed everything")
     
     return result
 

@@ -24,21 +24,21 @@
 #==============================================================================
 
 
-from __future__ import with_statement 
-from misc import grem, split_every
-from copy import deepcopy
-import math 
-import subprocess
-import sys 
-import time 
 from StringIO import StringIO
+from __future__ import with_statement
 from contextlib import closing
-
-from simulation_batch import SimulationBatch
+from copy import deepcopy
+from misc import grem, split_every, EnsureEqual, Ensure, EnsureNotEqual, Error
 from network_probability import NetworkProbability
 from psat_data import PsatData
 from psat_report import PsatReport
+from simulation_batch import SimulationBatch
+import math
 import os.path
+import subprocess
+import sys
+import time
+
 
 
 #==============================================================================
@@ -70,7 +70,7 @@ def make_outages(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.outages(str(x)))
-    assert count == batch.size()
+    EnsureEqual(count, batch.size())
     return batch
 
 
@@ -83,7 +83,7 @@ def make_failures(prob, count):
     batch = SimulationBatch()
     for x in range(count):
         batch.add(prob.failures(str(x)))
-    assert count == batch.size()
+    EnsureEqual(count, batch.size())
     return batch
 
 
@@ -100,7 +100,7 @@ def make_outage_cases(prob, count):
     while len(batch) < count:
         batch.add(prob.outages(str(current)))
         current += 1
-    assert count == len(batch)
+    EnsureEqual(count, len(batch))
     return batch
 
 def make_failure_cases(prob, count):
@@ -117,7 +117,7 @@ def make_failure_cases(prob, count):
     while len(batch) < count:
         batch.add(prob.failures(str(current)))
         current += 1
-    assert count == len(batch)
+    EnsureEqual(count, len(batch))
     return batch
 
 
@@ -205,7 +205,7 @@ def report_to_psat(report, psat):
     new_psat = deepcopy(psat)
     pf = report.power_flow
 
-    assert len(new_psat.slack) == 1
+    EnsureEqual(len(new_psat.slack), 1)
     slack = new_psat.slack.values()[0]
     slack.v_magnitude = float(pf[slack.bus_no].v)
     slack.ref_angle = float(pf[slack.bus_no].phase)
@@ -236,7 +236,7 @@ def report_to_psat(report, psat):
     if not new_psat.in_limits():
         print "not in limits"
         # TODO: I think it probably should raise... maybe
-        # raise Exception("new file is invalid. It hits static limits.")
+        # raise Error("new file is invalid. It hits static limits.")
     
     return new_psat
 
@@ -252,7 +252,7 @@ def text_to_scenario(text):
         batch = SimulationBatch()
         batch.read(batch_stream)
 
-    assert len(batch) == 1
+    EnsureEqual(len(batch), 1) 
     return list(batch)[0]
 
 
@@ -285,59 +285,63 @@ def batch_simulate(batch, psat, size=10, clean=True):
        of size `size`. Modify `batch` in place. delete all temp files
        if it succedes 
 
-       TODO: simulate can throw so we want each batch in a try/except block
     """
 
     print "[b] batch simulate %d cases" % len(batch)
     for n, group in enumerate(split_every(size, batch)):
-        timer_start = time.clock()
-        print "[b] simulating batch", n + 1, "of", int(math.ceil(len(batch) / size)) + 1
-        sys.stdout.flush()
-     
-        # make the matlab_script
-        matlab_filename = "matlab_" + str(n)
-        batch_matlab_script(matlab_filename + ".m", group)
-        
-        # write all the scenarios to file as psat_files
-        for scenario in group:
-            scenario.result = None
-
-            try:
-                new_psat = scenario_to_psat(scenario, psat)
-            except Exception as ex:
-                print "[b] exception in scenario_to_psat",
-                print scenario.title, ex
-                scenario.result = "error"
-                new_psat = deepcopy(psat)
-
-            new_psat_filename = "psat_" + scenario.title + ".m"
-            with open(new_psat_filename, "w") as new_psat_file:
-                new_psat.write(new_psat_file)
-        
-        # run matlab 
-        res = simulate(matlab_filename, False)
-        assert len(res) == len(group)
-        for r, scenario in zip(res, group):
-            if not(r):
-                print "[b] did not converge", scenario.title
-                scenario.result = "fail"
-        
-        # gather results
-        for scenario in group:
-            if not scenario.result:
-                report_filename = "psat_" + scenario.title + "_01.txt"
+        try:
+            timer_start = time.clock()
+            print "[b] simulating batch", n + 1, "of", int(math.ceil(len(batch) / size)) + 1
+            sys.stdout.flush()
+         
+            # make the matlab_script
+            matlab_filename = "matlab_" + str(n)
+            batch_matlab_script(matlab_filename + ".m", group)
+            
+            # write all the scenarios to file as psat_files
+            for scenario in group:
+                scenario.result = None
+    
                 try:
-                    report = read_report(report_filename)
-                    scenario.result = report_in_limits(report)
-                except Exception as ex:
-                    print "[b] exception in parsing/checking report",
-                    print scenario.title, ex
+                    new_psat = scenario_to_psat(scenario, psat)
+                except Exception as exce:
+                    print "[E] Error Caught at script.batch_simulate (%s) - failed to convert scenario to psat" % scenario.title
+                    print exce
                     scenario.result = "error"
-                
-
-        timer_end = time.clock()
-        timer_time = (timer_end - timer_start)
-        print "[b] batch time of", int(math.ceil(timer_time)), "seconds"
+                    # we probably shouldn't have this but it might cause error in matlab as it is expected.
+                    new_psat = deepcopy(psat)
+    
+                new_psat_filename = "psat_" + scenario.title + ".m"
+                with open(new_psat_filename, "w") as new_psat_file:
+                    new_psat.write(new_psat_file)
+            
+            # run matlab 
+            res = simulate(matlab_filename, False)
+            EnsureEqual(len(res), len(group))
+            for r, scenario in zip(res, group):
+                if not(r):
+                    print "[b] did not converge (%s)" % scenario.title
+                    scenario.result = "fail"
+            
+            # gather results
+            for scenario in group:
+                if not scenario.result:
+                    report_filename = "psat_" + scenario.title + "_01.txt"
+                    try:
+                        report = read_report(report_filename)
+                        scenario.result = report_in_limits(report)
+                    except Exception as exce:
+                        print "[E] Error Caught at script.batch_simulate (%s) - report check failure" % scenario.title
+                        print exce
+                        scenario.result = "error"
+                    
+    
+            timer_end = time.clock()
+            timer_time = (timer_end - timer_start)
+            print "[b] batch time of", int(math.ceil(timer_time)), "seconds"
+        except Exception as exce:
+            print "[E] Error Caught at script.batch_simulate (%s) - failed to simulate batch" % scenario.title
+            print exce
 
     if clean:
         clean_files()
@@ -360,7 +364,7 @@ def single_simulate(psat, simtype, title, clean=True):
     single_matlab_script(matlab_filename + ".m", psat_filename, simtype)
 
     # write the PsatData to file
-    assert(psat.in_limits())
+    Ensure(psat.in_limits(), "no point simulating if it's already out of limits")
     with open(psat_filename, "w") as psat_file:
         psat.write(psat_file)
 
@@ -408,7 +412,7 @@ def single_matlab_script(filename, psat_filename, simtype):
             matlab_stream.write("OPF.basepl = 0;\n")
             matlab_stream.write("runpsat opf;\n")
         else:
-            raise Exception("expected pf or opf got: " + simtype)
+            raise Error("expected pf or opf got: " + simtype)
         matlab_stream.write("runpsat pfrep;\n")
         matlab_stream.write("closepsat;\n")
         matlab_stream.write("exit;\n")
@@ -422,7 +426,7 @@ def batch_matlab_script(filename, batch):
            "psat_" + scenario.title + ".m"
     """
 
-    assert len(batch) != 0
+    EnsureNotEqual(len(batch), 0)
     with open(filename, "w") as matlab_stream:
 
         matlab_stream.write("initpsat;\n")
@@ -437,14 +441,14 @@ def batch_matlab_script(filename, batch):
             filename = "psat_" + scenario.title + ".m"
             matlab_stream.write("runpsat('" + filename + "','data');\n")
 
-            assert simtype == scenario.simtype
+            EnsureEqual(simtype, scenario.simtype)
 
             if simtype == "pf":
                 matlab_stream.write("runpsat pf;\n")
             elif simtype == "opf":
                 matlab_stream.write("runpsat opf;\n")
             else:
-                raise Exception("expected pf or opf got: " + scenario.simtype)
+                raise Error("expected pf or opf got: " + scenario.simtype)
             matlab_stream.write("runpsat pfrep;\n")
 
         matlab_stream.write("closepsat;\n")
@@ -472,7 +476,7 @@ def parse_matlab_output(text):
                 passed = False
 
             if found("Warning: Matrix is close to singular", sim_text):
-                print "near singular matrix warning", n
+                # print "near singular matrix warning", n
                 passed = False
                 
             if found("The error is increasing too much", sim_text):
@@ -491,7 +495,7 @@ def parse_matlab_output(text):
 
         result.append(passed)
 
-    assert len(result) >= 1, str(result)
+    Ensure(len(result) >= 1, str(result))
     return result
 
 
@@ -524,13 +528,13 @@ def simulate(matlab_filename, single_item=True):
             print so 
             print "================================="
 
-        assert se == "", "sim-error: " + se
+        EnsureEqual(se, "")
 
         result = parse_matlab_output(so)
-        assert len(result) >= 1, str(result)
+        Ensure(len(result) >= 1, "there has to be at least one result (%s)" % str(result))
 
         if single_item:
-            assert len(result) == 1
+            EnsureEqual(len(result), 1)
             if result[0]:
                 print "simulate passed"
             else:
@@ -538,8 +542,9 @@ def simulate(matlab_filename, single_item=True):
 
         return result
 
-    except:
-        print "simulate failed"
+    except Exception as exce:
+        print "[E] Error Caught at script.simulate (%s)" % matlab_filename
+        print exce
         raise
 
 #==============================================================================

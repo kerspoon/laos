@@ -4,6 +4,7 @@
 import random
 from modifiedtestcase import ModifiedTestCase
 import unittest
+from misc import Error
 
 
 # http://www.ee.washington.edu/research/pstca/rts/rts96/
@@ -40,14 +41,14 @@ def autumn(week):
 def weektype(day):
     if weekend(day): return "weekend"
     if weekday(day): return "weekday"
-    assert False
+    else: raise Error("day (%s) is not a weekday or weekend?!" % str(day))
 
 def season(week):
     if spring(week): return "spring"
     if summer(week): return "summer"
     if autumn(week): return "autumn"
     if winter(week): return "winter"
-    assert False
+    else: raise Error("week (%s) is not a proper season?!" % str(week))
 
 hourly_winter = dict(
     weekday=[67, 63, 60, 59, 59, 60, 74, 86, 95, 96, 96, 95, 95, 95, 93, 94, 99, 100, 100, 96, 91, 83, 73, 63],
@@ -73,8 +74,9 @@ hourly = dict(
 
 def forecast_load(week, day, hour):
     """returns the peak load as a percentage of annual value"""
-    assert 0 <= week <= 51
-    assert 0 <= hour <= 23
+    if not (0 <= week <= 51): raise Error("week (%s) is out of bounds" % str(week))
+    if not (0 <= hour <= 23): raise Error("hour (%s) is out of bounds" % str(hour))
+    
     m1 = weekly[week] 
     m2 = daily[day]
     m3 = hourly[season(week)][weektype(day)][hour]

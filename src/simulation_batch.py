@@ -28,7 +28,7 @@ simulation_batch.py - SimulationBatch - batch_file - batch
 #==============================================================================
 
 from StringIO import StringIO
-from misc import as_csv
+from misc import as_csv, Ensure, EnsureIn, EnsureEqual, Error
 from modifiedtestcase import ModifiedTestCase
 import collections
 import unittest
@@ -86,18 +86,18 @@ class Scenario(object):
         self.result = None
 
     def invariant(self):
-        assert len(self.title) > 0
-        assert self.count > 0
-        assert self.simtype in set(["pf", "opf"])
+        Ensure(len(self.title) > 0, "Scenarios must have a title")
+        Ensure(self.count > 0, "Scenarios must have a count")
+        EnsureIn(self.simtype, set(["pf", "opf"]))
         if self.result:
-            assert self.result in set(["pass", "fail", "error"])
+            EnsureIn(self.result, set(["pass", "fail", "error"]))
 
     def write(self, stream):
         self.invariant()
 
         if self.count != 1:
-            stream.write("[%s] %s %d\n" % (self.title, 
-                                           self.simtype, 
+            stream.write("[%s] %s %d\n" % (self.title,
+                                           self.simtype,
                                            self.count))
         else:
             stream.write("[%s] %s\n" % (self.title, self.simtype))
@@ -115,7 +115,7 @@ class Scenario(object):
 
     def csv_write(self, stream):
         self.invariant()
-        infoline = [self.title, self.simtype, 
+        infoline = [self.title, self.simtype,
                     self.count, self.all_demand, self.result]
         kills = self.kill_bus + self.kill_line + self.kill_gen
         stream.write(as_csv(infoline + kills, "\t") + "\n")
@@ -183,12 +183,12 @@ class SimulationBatch(object):
             #                              dicthash)
 
             # make sure we don't have hash collision
-            assert self.scenarios[dicthash].equal(scenario)
+            Ensure(self.scenarios[dicthash].equal(scenario), "we have a hash collision")
 
             # make sure we keep result info
             if scenario.result:
                 if self.scenarios[dicthash].result:
-                    assert scenario.result == self.scenarios[dicthash].result
+                    EnsureEqual(scenario.result, self.scenarios[dicthash].result)
                 else:
                     self.scenarios[dicthash].result = scenario.result
 
@@ -229,10 +229,10 @@ class SimulationBatch(object):
                 if len(line) == 3:
                     count = int(line[2])
                 else:
-                    assert len(line) == 2
+                    EnsureEqual(len(line), 2)
                     count = 1
 
-                assert simtype == "pf" or simtype == "opf"
+                EnsureIn(simtype, set("pf opf".split()))
                 current_scen = Scenario(title, simtype, count)
 
             # remove 
@@ -244,7 +244,7 @@ class SimulationBatch(object):
                 elif line[1] == "generator":
                     current_scen.kill_gen.append(line[2])
                 else:
-                    raise Exception("got %s expected (line, generator, bus)" 
+                    raise Error("got %s expected (line, generator, bus)" 
                                     % line[1])
             
             # set
@@ -252,16 +252,16 @@ class SimulationBatch(object):
                 if line[1:3] == ["all", "demand"]:
                     current_scen.all_demand = float(line[3])
                 else:
-                    raise Exception("got %s expected 'demand'" % line[1])
+                    raise Error("got %s expected 'demand'" % line[1])
                 
             # results 
             elif line[0] == "result":
-                assert line[1] in set("pass fail error".split())
+                EnsureIn(line[1], set("pass fail error".split()))
                 current_scen.result = line[1]
 
             # nothing else allowed
             else:
-                raise Exception("got %s expected (remove, set, result, [])" 
+                raise Error("got %s expected (remove, set, result, [])" 
                                 % line[0])
 
 

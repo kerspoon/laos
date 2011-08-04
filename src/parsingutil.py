@@ -1,5 +1,6 @@
 #! /usr/local/bin/python
 # Utilities for pyparsing
+from misc import Error
 
 #==============================================================================
 # Copyright (C) 2009 James Brooks (kerspoon)
@@ -49,7 +50,7 @@ class ToBoolean(TokenConverter):
         elif tok in ["f", "false", "0"]:
             return False
         else:
-            raise Exception
+            raise Error("token (%s) must be boolean" % tok)
 
 class ToInteger(TokenConverter):
     """ Converter to make token into an integer """

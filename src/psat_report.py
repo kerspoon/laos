@@ -1,5 +1,6 @@
 #! /usr/local/bin/python
 # psat_report.py - PsatReport - report_file - report
+from misc import Ensure, Error
 
 #==============================================================================
 # Copyright (C) 2009 James Brooks (kerspoon)
@@ -99,12 +100,13 @@ class PsatReport(object):
             case = headers + stats + pflow + lineflow + summary + limits
             self.data = case.parseFile(stream)
             # print "Done Parsing stream"
-        except:
-            print "PARSING ERROR"
+        except Exception as exce:
+            print "[E] Error Caught at psat_report.read (%s)" % stream.name
+            print exce
             raise
         return self.acceptable
 
-    def ensure(self, cond, text):
+    def ensure(self, cond, _text):
         if not cond:
             # print "FAIL!!!\t", text
             self.acceptable = False
@@ -118,7 +120,7 @@ class PsatReport(object):
             # print "Optimal Power Flow"
             pass 
         else:
-            raise Exception("%s" % tokens)
+            raise Error("%s" % tokens)
 
     def process_stats(self, tokens):
         # print("Stats : %s" % tokens)
@@ -172,8 +174,8 @@ class PsatReport(object):
 
         bus_num = tokens["bus"][0]
 
-        assert bus_num >= 0
-        assert bus_num not in self.power_flow, "already added bus " + str(bus_num) 
+        Ensure(bus_num >= 0, "cant have negative bus_num (%s)" % bus_num)
+        Ensure(bus_num not in self.power_flow, "already added bus " + str(bus_num))
 
         self.power_flow[bus_num] = self.PowerFlow(
             bus_num,

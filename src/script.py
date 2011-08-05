@@ -316,10 +316,10 @@ def batch_simulate(batch, psat, size=10, clean=True):
                     new_psat.write(new_psat_file)
             
             # run matlab 
-            res = simulate(matlab_filename, False)
-            EnsureEqual(len(res), len(group))
-            for r, scenario in zip(res, group):
-                if not(r):
+            resutls = simulate(matlab_filename, False)
+            EnsureEqual(len(resutls), len(group))
+            for res, scenario in zip(resutls, group):
+                if not(res):
                     print "[b] did not converge (%s)" % scenario.title
                     scenario.result = "fail"
             
@@ -467,31 +467,29 @@ def parse_matlab_output(text):
 
         if found("IPM-OPF", sim_text):
             if not found("IPM-OPF completed in", sim_text):
-                print "opf not completed", n
+                print "[P] opf not completed", n
                 passed = False
         else:
             # we don't cae if the PF before the OPF fails. 
             if found("Warning: Matrix is singular", sim_text):
-                print "singular matrix warning", n
+                print "[P] singular matrix warning", n
                 passed = False
 
             if found("Warning: Matrix is close to singular", sim_text):
-                # print "near singular matrix warning", n
+                print "[P] near singular matrix warning", n
                 passed = False
                 
             if found("The error is increasing too much", sim_text):
-                print "large error", n
+                print "[P] large error", n
                 passed = False
 
             if found("Convergence is likely not reachable", sim_text):
-                print "non-convergence", n
+                print "[P] non-convergence", n
                 passed = False
 
             if not found("Power Flow completed in", sim_text):
-                print "power flow not completed", n
+                print "[P] power flow not completed", n
                 passed = False
-
-
 
         result.append(passed)
 
@@ -536,9 +534,9 @@ def simulate(matlab_filename, single_item=True):
         if single_item:
             EnsureEqual(len(result), 1)
             if result[0]:
-                print "simulate passed"
+                print "[S] simulate passed."
             else:
-                print "did not converge (in simulate)"
+                print "[S] simulate failed."
 
         return result
 

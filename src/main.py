@@ -16,7 +16,9 @@ import time
 def simulate_cases(outage_batch, failure_batch, psat, summary_file):
     clean_files()
 
-    print "[C] simulate %d unique states with %d unique contingencies" % (len(outage_batch), len(failure_batch))
+    print "[C] simulate %d unique states with %d unique contingencies" % (
+                                                        len(outage_batch), 
+                                                        len(failure_batch))
     
     for n, scenario in enumerate(outage_batch):
         try:
@@ -124,4 +126,4 @@ def generate_cases(n_outages=10, n_failures=1000, sim=True, full_sim=True):
 
 
 if __name__ == '__main__':
-    generate_cases(2, 10, True, True)
+    generate_cases(2, 1000, True, True)

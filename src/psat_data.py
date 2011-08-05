@@ -339,7 +339,7 @@ class PsatData(object):
             self.demand[load.bus_no].p_bid_max = newval
             self.demand[load.bus_no].p_bid_min = newval
             
-    def get_stats(self):
+    def print_stats(self):
         
         scheduleable_generators = self.generators.values()
         min_limit = []
@@ -363,7 +363,7 @@ class PsatData(object):
         gpowers = [gen.p for gen in scheduleable_generators] + [slack.p_guess for slack in self.slack.values()]
         lpowers = [load.p for load in self.loads.values()]
         
-        print "mis=%f, gen=%f, load=%f lim (%f < X < %f)" % (self.mismatch, sum(gpowers), 
+        print "mis= %f gen= %f load= %f lim ( %f < X < %f )" % (self.mismatch, sum(gpowers), 
                                                           sum(lpowers),  sum(min_limit), 
                                                           sum(max_limit))
 
@@ -379,6 +379,8 @@ class PsatData(object):
         TODO: Not sure what to do with reactive power
         TODO: make this only count scheduleable generators i.e. not wind farms
         """
+        
+        self.print_stats()
         
         if self.mismatch != 0:
     

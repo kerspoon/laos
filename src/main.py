@@ -153,17 +153,22 @@ def test_case(both=False, clean=False):
         print "result 2 = '" + str(report_in_limits(report_2)) + "'"
         
 
-            
-if __name__ == '__main__':
-    run_this = 'generate_cases(0, 1000, True, False)'
-    # run_this = test_case(True)
-    grem(".", r"failure[0-9]*.txt")
-    grem(".", r"outage[0-9]*.txt")
-    grem(".", r"summary.txt")
-    grem(".", r"stdout.txt")
+def profile(run_this = 'generate_cases(0, 100, True, False)'):
     cProfile.run(run_this, 'foo.prof')
     print '-' * 80
     print '-' * 80
     print '-' * 80
     p = pstats.Stats('foo.prof')
     p.strip_dirs().sort_stats(-1).print_stats()
+
+
+if __name__ == '__main__':
+    
+    grem(".", r"failure[0-9]*.txt")
+    grem(".", r"outage[0-9]*.txt")
+    grem(".", r"summary.txt")
+    # grem(".", r"stdout.txt")
+    
+    generate_cases(0, 1000, True, False)
+    # run_this = test_case(True)
+    

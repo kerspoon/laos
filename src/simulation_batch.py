@@ -183,12 +183,14 @@ class SimulationBatch(object):
             #                              dicthash)
 
             # make sure we don't have hash collision
-            Ensure(self.scenarios[dicthash].equal(scenario), "we have a hash collision")
+            Ensure(self.scenarios[dicthash].equal(scenario), 
+                   "we have a hash collision")
 
             # make sure we keep result info
             if scenario.result:
                 if self.scenarios[dicthash].result:
-                    EnsureEqual(scenario.result, self.scenarios[dicthash].result)
+                    EnsureEqual(scenario.result, 
+                                self.scenarios[dicthash].result)
                 else:
                     self.scenarios[dicthash].result = scenario.result
 
@@ -317,10 +319,10 @@ class SimulationBatch(object):
 class TestRead(ModifiedTestCase):
 
     def util_readwrite_match(self, inp):
-        sb = SimulationBatch()
-        sb.read(StringIO(inp))
+        batch = SimulationBatch()
+        batch.read(StringIO(inp))
         stream = StringIO()
-        sb.write(stream)
+        batch.write(stream)
         self.assertEqual(stream.getvalue(), inp)
         
     def test_1(self):
@@ -359,82 +361,82 @@ class TestRead(ModifiedTestCase):
 class TestAdd(ModifiedTestCase):
 
     def test_001(self):
-        sb = SimulationBatch()
+        batch = SimulationBatch()
 
-        a = Scenario("a")
-        a.kill_bus.append(12)
-        sb.add(a)
+        scenario = Scenario("scenario-a")
+        scenario.kill_bus.append(12)
+        batch.add(scenario)
       
-        b = Scenario("b")
-        b.kill_bus.append(12)
-        sb.add(b)
+        scenariob = Scenario("scenario-b")
+        scenariob.kill_bus.append(12)
+        batch.add(scenariob)
       
-        self.assertEqual(len(sb), 1)
-        self.assertEqual(sb.size(), 2)
+        self.assertEqual(len(batch), 1)
+        self.assertEqual(batch.size(), 2)
       
     def test_002(self):
-        sb = SimulationBatch()
+        batch = SimulationBatch()
 
-        a = Scenario("a")
-        a.kill_bus.append(12)
-        sb.add(a)
+        scenario = Scenario("scenario-a")
+        scenario.kill_bus.append(12)
+        batch.add(scenario)
       
-        b = Scenario("b")
-        b.kill_bus.append(13)
-        sb.add(b)
+        scenariob = Scenario("scenario-b")
+        scenariob.kill_bus.append(13)
+        batch.add(scenariob)
       
-        self.assertEqual(len(sb), 2)
-        self.assertEqual(sb.size(), 2)
+        self.assertEqual(len(batch), 2)
+        self.assertEqual(batch.size(), 2)
       
     def test_003(self):
-        sb = SimulationBatch()
+        batch = SimulationBatch()
 
-        a = Scenario("a")
-        a.kill_bus.append(12)
-        sb.add(a)
+        scenarioa = Scenario("a")
+        scenarioa.kill_bus.append(12)
+        batch.add(scenarioa)
       
-        c = Scenario("c")
-        c.kill_bus.append(12)
-        sb.add(c)
+        scenarioc = Scenario("c")
+        scenarioc.kill_bus.append(12)
+        batch.add(scenarioc)
 
-        b = Scenario("b")
-        b.kill_bus.append(13)
-        sb.add(b)
+        scenariob = Scenario("b")
+        scenariob.kill_bus.append(13)
+        batch.add(scenariob)
 
-        d = Scenario("d")
-        d.kill_bus.append(12)
-        sb.add(d)
+        scenariod = Scenario("d")
+        scenariod.kill_bus.append(12)
+        batch.add(scenariod)
       
-        self.assertEqual(len(sb), 2)
-        self.assertEqual(sb.size(), 4)
+        self.assertEqual(len(batch), 2)
+        self.assertEqual(batch.size(), 4)
       
     def test_004(self):
-        sb = SimulationBatch()
+        batch = SimulationBatch()
 
-        a = Scenario("a", "pf")
-        a.kill_bus.append(12)
-        sb.add(a)
+        scenarioa = Scenario("a", "pf")
+        scenarioa.kill_bus.append(12)
+        batch.add(scenarioa)
       
-        b = Scenario("b", "opf")
-        b.kill_bus.append(12)
-        sb.add(b)
+        scenariob = Scenario("b", "opf")
+        scenariob.kill_bus.append(12)
+        batch.add(scenariob)
       
-        self.assertEqual(len(sb), 2)
-        self.assertEqual(sb.size(), 2)
+        self.assertEqual(len(batch), 2)
+        self.assertEqual(batch.size(), 2)
       
     def test_005(self):
-        sb = SimulationBatch()
+        batch = SimulationBatch()
 
-        a = Scenario("a", "pf", 23)
-        a.kill_bus.append(12)
-        sb.add(a)
+        scenarioa = Scenario("a", "pf", 23)
+        scenarioa.kill_bus.append(12)
+        batch.add(scenarioa)
       
-        b = Scenario("b", "pf", 100)
-        b.kill_bus.append(12)
-        sb.add(b)
+        scenariob = Scenario("b", "pf", 100)
+        scenariob.kill_bus.append(12)
+        batch.add(scenariob)
       
-        self.assertEqual(len(sb), 1)
-        self.assertEqual(sb.size(), 123)
+        self.assertEqual(len(batch), 1)
+        self.assertEqual(batch.size(), 123)
         
 
 

@@ -40,8 +40,6 @@ Bugs
 To Do
 ====
 
- - Make simulate_cases and generate_cases report the summary to a summary file with section headers.
- - generate_cases(10 by 1000)
  - make report on why things fail and pass 
  - show to rod
 

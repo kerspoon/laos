@@ -24,8 +24,8 @@
 #==============================================================================
 
 
-from StringIO import StringIO
 from __future__ import with_statement
+from StringIO import StringIO
 from contextlib import closing
 from copy import deepcopy
 from misc import grem, split_every, EnsureEqual, Ensure, EnsureNotEqual, Error

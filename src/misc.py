@@ -326,6 +326,8 @@ def EnsureEqual(first, second, msg=""):
     
 def EnsureNotEqual(first, second, msg=""):
     if first == second:
+        if str(first) == str(second):
+            raise Error("Expected Type '%s' = '%s' on '%s' %s" % (first.__class__, second.__class__, str(first), msg), -2)
         raise Error("Expected '%s' = '%s' %s" % (str(first), str(second), msg), -2)
 
 def EnsureIn(first, second, msg=""):

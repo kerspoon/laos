@@ -207,6 +207,8 @@ class PsatData(object):
         if len(self.slack) == 1:
             slack = self.slack.values()[0]
             EnsureNotEqual(slack.bus_no, bus_no)
+        else:
+            print "Expected one slack got %d" % len(self.slack)
  
 
         EnsureEqual(self.busses[bus_no].bus_no, bus_no)
@@ -336,6 +338,34 @@ class PsatData(object):
             load.p = newval
             self.demand[load.bus_no].p_bid_max = newval
             self.demand[load.bus_no].p_bid_min = newval
+            
+    def get_stats(self):
+        
+        scheduleable_generators = self.generators.values()
+        min_limit = []
+        max_limit = []
+        for gen in scheduleable_generators:
+            min_limit.append(sum(supply.p_bid_min for supply in 
+                              self.supply.values() 
+                              if supply.bus_no == gen.bus_no))
+            max_limit.append(sum(supply.p_bid_max for supply in 
+                              self.supply.values() 
+                              if supply.bus_no == gen.bus_no))
+
+        for slack in self.slack.values():
+            min_limit.append(sum(supply.p_bid_min for supply in 
+                              self.supply.values() 
+                              if supply.bus_no == slack.bus_no))
+            max_limit.append(sum(supply.p_bid_max for supply in 
+                              self.supply.values() 
+                              if supply.bus_no == slack.bus_no))
+                
+        gpowers = [gen.p for gen in scheduleable_generators] + [slack.p_guess for slack in self.slack.values()]
+        lpowers = [load.p for load in self.loads.values()]
+        
+        print "mis=%f, gen=%f, load=%f lim (%f < X < %f)" % (self.mismatch, sum(gpowers), 
+                                                          sum(lpowers),  sum(min_limit), 
+                                                          sum(max_limit))
 
     def fix_mismatch(self):
         """
@@ -347,37 +377,45 @@ class PsatData(object):
 
         It does this by using `self.mismatch`
         TODO: Not sure what to do with reactive power
-        TODO: make this only count scheduleable generators
-              i.e. not wind farms
+        TODO: make this only count scheduleable generators i.e. not wind farms
         """
+        
+        if self.mismatch != 0:
+    
+            scheduleable_generators = self.generators.values()
+        
+            gpowers = [gen.p for gen in scheduleable_generators] + [slack.p_guess for slack in self.slack.values()]
+            
+            min_limit = []
+            max_limit = []
+            for gen in scheduleable_generators:
+                min_limit.append(sum(supply.p_bid_min for supply in 
+                                  self.supply.values() 
+                                  if supply.bus_no == gen.bus_no))
+                max_limit.append(sum(supply.p_bid_max for supply in 
+                                  self.supply.values() 
+                                  if supply.bus_no == gen.bus_no))
+                
 
-        if self.mismatch == 0:
-            Ensure(self.in_limits(), "fixing mismatch should leave it in limit")
-            return
-
-        scheduleable_generators = self.generators.values()
-
-        powers = [gen.p for gen in scheduleable_generators]
-
-        min_limit = []
-        max_limit = []
-        for gen in scheduleable_generators:
-            min_limit.append(sum(supply.p_bid_min for supply in 
-                              self.supply.values() 
-                              if supply.bus_no == gen.bus_no))
-            max_limit.append(sum(supply.p_bid_max for supply in 
-                              self.supply.values() 
-                              if supply.bus_no == gen.bus_no))
-
-        # print "-----"
-        # for x,y in zip(powers, limits):
-        #     print x,y
-        # print "-----"
-
-        res = fix_mismatch(-self.mismatch, powers, min_limit, max_limit)
-
-        for newp, generator in zip(res, scheduleable_generators):
-            generator.p = newp
+            for slack in self.slack.values():
+                min_limit.append(sum(supply.p_bid_min for supply in 
+                                  self.supply.values() 
+                                  if supply.bus_no == slack.bus_no))
+                max_limit.append(sum(supply.p_bid_max for supply in 
+                                  self.supply.values() 
+                                  if supply.bus_no == slack.bus_no))
+    
+            #print "-----"
+            #print "t %f => %f < %f < %f" % (self.mismatch, sum(min_limit), sum(powers), sum(max_limit))
+            #for pmin,power,pmax in zip(min_limit, powers, max_limit):
+            #    print "p %f < %f < %f" % (pmin,power,pmax)
+            #print "-----"
+             
+    
+            res = fix_mismatch(-self.mismatch, gpowers, min_limit, max_limit)
+    
+            for newp, generator in zip(res, scheduleable_generators):
+                generator.p = newp
 
         Ensure(self.in_limits(), "fixing mismatch should leave it in limit")
     
@@ -455,7 +493,8 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
                 return n
         return None
 
-    Ensure(sum(min_limit) < sum(power) + mismatch < sum(max_limit), "We cannot fix a mismatch (of %f) that is outside limits" % mismatch)
+    Ensure(sum(min_limit) < sum(power) + mismatch < sum(max_limit), 
+           "mismatch of %f is outside limits (%f < %f < %f)" % (mismatch, sum(min_limit), sum(power) + mismatch , sum(max_limit)))
 
     # print "mismatch\t%f" % mismatch
     # print "total gen\t%f" % sum(power)
@@ -518,7 +557,11 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
   
     # check nothing is out of limits 
     for idx in range(len(power)):
-        Ensure(min_limit[idx] <= power[idx] <= max_limit[idx], "Power (%f) out of limit (%f<=%f<=%f)" % (idx, min_limit[idx], power[idx], max_limit[idx]))
+        Ensure(min_limit[idx] <= power[idx] <= max_limit[idx], 
+               "Power (%d) out of limit (%f<=%f<=%f)" % (idx, 
+                                                         min_limit[idx], 
+                                                         power[idx], 
+                                                         max_limit[idx]))
     Ensure(mismatch < 0.001, "should be much mismatch left after fixing it")
     Ensure(all(done), "should have fixed everything")
     

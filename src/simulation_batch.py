@@ -263,8 +263,7 @@ class SimulationBatch(object):
 
             # nothing else allowed
             else:
-                raise Error("got %s expected (remove, set, result, [])" 
-                                % line[0])
+                raise Error("got %s expected (remove, set, result, [])" % line[0])
 
 
         if current_scen is not None:

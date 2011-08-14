@@ -183,13 +183,13 @@ class SimulationBatch(object):
             #                              dicthash)
 
             # make sure we don't have hash collision
-            Ensure(self.scenarios[dicthash].equal(scenario), 
+            Ensure(self.scenarios[dicthash].equal(scenario),
                    "we have a hash collision")
 
             # make sure we keep result info
             if scenario.result:
                 if self.scenarios[dicthash].result:
-                    EnsureEqual(scenario.result, 
+                    EnsureEqual(scenario.result,
                                 self.scenarios[dicthash].result)
                 else:
                     self.scenarios[dicthash].result = scenario.result

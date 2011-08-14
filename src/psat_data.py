@@ -339,7 +339,7 @@ class PsatData(object):
             self.demand[load.bus_no].p_bid_max = newval
             self.demand[load.bus_no].p_bid_min = newval
             
-    def print_stats(self):
+    def get_stats(self):
         
         scheduleable_generators = self.generators.values()
         min_limit = []
@@ -363,9 +363,8 @@ class PsatData(object):
         gpowers = [gen.p for gen in scheduleable_generators] + [slack.p_guess for slack in self.slack.values()]
         lpowers = [load.p for load in self.loads.values()]
         
-        print "mis= %f gen= %f load= %f lim ( %f < X < %f )" % (self.mismatch, sum(gpowers), 
-                                                          sum(lpowers),  sum(min_limit), 
-                                                          sum(max_limit))
+        return (self.mismatch, sum(gpowers), sum(lpowers), sum(min_limit), sum(max_limit))
+        # return "mis= %f gen= %f load= %f lim ( %f < X < %f )"
 
     def fix_mismatch(self):
         """
@@ -379,8 +378,6 @@ class PsatData(object):
         TODO: Not sure what to do with reactive power
         TODO: make this only count scheduleable generators i.e. not wind farms
         """
-        
-        self.print_stats()
         
         if self.mismatch != 0:
     
@@ -495,7 +492,7 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
                 return n
         return None
 
-    Ensure(sum(min_limit) < sum(power) + mismatch < sum(max_limit), 
+    Ensure(sum(min_limit) < sum(power) + mismatch < sum(max_limit),
            "mismatch of %f is outside limits (%f < %f < %f)" % (mismatch, sum(min_limit), sum(power) + mismatch , sum(max_limit)))
 
     # print "mismatch\t%f" % mismatch
@@ -559,10 +556,10 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
   
     # check nothing is out of limits 
     for idx in range(len(power)):
-        Ensure(min_limit[idx] <= power[idx] <= max_limit[idx], 
-               "Power (%d) out of limit (%f<=%f<=%f)" % (idx, 
-                                                         min_limit[idx], 
-                                                         power[idx], 
+        Ensure(min_limit[idx] <= power[idx] <= max_limit[idx],
+               "Power (%d) out of limit (%f<=%f<=%f)" % (idx,
+                                                         min_limit[idx],
+                                                         power[idx],
                                                          max_limit[idx]))
     Ensure(mismatch < 0.001, "should be much mismatch left after fixing it")
     Ensure(all(done), "should have fixed everything")

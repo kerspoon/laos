@@ -4,7 +4,7 @@ Created on 27 Jul 2011
 @author: james
 '''
 
-from misc import Ensure, grem
+from misc import Ensure, grem, as_csv
 from script import clean_files, simulate_scenario, report_to_psat, \
     batch_simulate, read_psat, read_probabilities, make_outage_cases, \
     make_failure_cases, text_to_scenario, report_in_limits
@@ -15,11 +15,11 @@ import cProfile
 import pstats
 
 
-def simulate_cases(outage_batch, failure_batch, psat, summary_file):
+def simulate_cases(outage_batch, failure_batch, psat, summary_file, mismatch_file):
     clean_files()
 
     print "[C] simulate %d unique states with %d unique contingencies" % (
-                                                        len(outage_batch), 
+                                                        len(outage_batch),
                                                         len(failure_batch))
     
     for n, scenario in enumerate(outage_batch):
@@ -28,12 +28,15 @@ def simulate_cases(outage_batch, failure_batch, psat, summary_file):
             report = simulate_scenario(psat, scenario, False)
             scenario_psat = report_to_psat(report, psat)
             clean_files()
+            mismatch_file.write(as_csv("---- ---- ---- ---- ---- ----".split()) + "\n")
+            mismatch_file.write(as_csv([scenario.title] + list(scenario_psat.get_stats())) + "\n")
+            mismatch_file.write(as_csv("---- ---- ---- ---- ---- ----".split()) + "\n")
             print "[C] simulating state - prep done."
 
             for x in failure_batch:
                 x.result = None
 
-            batch_simulate(failure_batch, scenario_psat, 100)
+            batch_simulate(failure_batch, scenario_psat, 100, True, mismatch_file)
             
             filename = scenario.title + ".txt"
             with open(filename, "w") as result_file:
@@ -65,16 +68,23 @@ def generate_cases(n_outages=10, n_failures=1000, sim=True, full_sim=True):
     batch_size = 100 
     psat = read_psat("rts.m")
     prob = read_probabilities("rts.net")
+    
 
     # create the base cases by sampling for outages 
     # simulate these and print to a file.
     # it should contain `n_outages` outages.
     
     summary_file = open("summary.txt", "w")
+    
+    mismatch_file = open("mismatch.txt", "w")
+    print "Base Stats: mis= %f gen= %f load= %f lim ( %f < X < %f )" % psat.get_stats()
+    mismatch_file.write(as_csv("title mismatch gen load min max".split()) + "\n")
+    mismatch_file.write(as_csv(["base"] + list(psat.get_stats())) + "\n")
+    
     try:
         if n_outages:
             outage_batch = make_outage_cases(prob, n_outages)
-            if sim: batch_simulate(outage_batch, psat, batch_size)
+            if sim: batch_simulate(outage_batch, psat, batch_size, True, mismatch_file)
     
             with open("outage.txt", "w") as result_file:
                 outage_batch.csv_write(result_file)
@@ -95,7 +105,7 @@ def generate_cases(n_outages=10, n_failures=1000, sim=True, full_sim=True):
         # do the same for one hour changes to the system.
         if n_failures:
             failure_batch = make_failure_cases(prob, n_failures)
-            if sim: batch_simulate(failure_batch, psat, batch_size)
+            if sim: batch_simulate(failure_batch, psat, batch_size, True, mismatch_file)
     
             with open("failure.txt", "w") as result_file:
                 failure_batch.csv_write(result_file)
@@ -114,7 +124,7 @@ def generate_cases(n_outages=10, n_failures=1000, sim=True, full_sim=True):
     
         # simulate each of the changes to each base case
         if full_sim: 
-            simulate_cases(outage_batch, failure_batch, psat, summary_file)
+            simulate_cases(outage_batch, failure_batch, psat, summary_file, mismatch_file)
         
             timer_end = time.clock()
             timer_time = (timer_end - timer_start)
@@ -139,27 +149,27 @@ def test_case(both=False, clean=False):
              [test_case_2] opf
              """
            
-    scenario      = text_to_scenario(data)
-    psat          = read_psat("rts.m")
-    report        = simulate_scenario(psat, scenario, clean)
+    scenario = text_to_scenario(data)
+    psat = read_psat("rts.m")
+    report = simulate_scenario(psat, scenario, clean)
     print "result = '" + str(report_in_limits(report)) + "'"
 
     if both:
         # clean_files()
         
-        scenario_2      = text_to_scenario(data_2)
-        psat_2          = report_to_psat(report, psat)
-        report_2        = simulate_scenario(psat_2, scenario_2, clean)
+        scenario_2 = text_to_scenario(data_2)
+        psat_2 = report_to_psat(report, psat)
+        report_2 = simulate_scenario(psat_2, scenario_2, clean)
         print "result 2 = '" + str(report_in_limits(report_2)) + "'"
         
 
-def profile(run_this = 'generate_cases(0, 100, True, False)'):
+def profile(run_this='generate_cases(0, 100, True, False)'):
     cProfile.run(run_this, 'foo.prof')
     print '-' * 80
     print '-' * 80
     print '-' * 80
     p = pstats.Stats('foo.prof')
-    p.strip_dirs().sort_stats(-1).print_stats()
+    p.strip_dirs().sort_stats(-1).get_stats()
 
 
 if __name__ == '__main__':
@@ -169,6 +179,6 @@ if __name__ == '__main__':
     grem(".", r"summary.txt")
     # grem(".", r"stdout.txt")
     
-    generate_cases(0, 1000, True, False)
+    generate_cases(2, 1000, True, True)
     # run_this = test_case(True)
     

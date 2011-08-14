@@ -31,7 +31,7 @@ def print_vars(vars, width=72, afile=None):
             value = '"' + value.encode("string_escape") + '"'
         if isinstance(value, unicode):
             value = 'u"' + value.encode(
-                                    sys.getdefaultencoding(), 
+                                    sys.getdefaultencoding(),
                                     'replace').encode("string_escape") + '"'
         try:
             var += "%s = %s" % (key, value)
@@ -51,7 +51,7 @@ def format_vars(vars, width=72):
             value = '"' + value.encode("string_escape") + '"'
         if isinstance(value, unicode):
             value = 'u"' + value.encode(
-                                    sys.getdefaultencoding(), 
+                                    sys.getdefaultencoding(),
                                     'replace').encode("string_escape") + '"'
         try:
             var += "%s = %s" % (key, value)

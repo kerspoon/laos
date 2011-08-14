@@ -28,7 +28,8 @@ from __future__ import with_statement
 from StringIO import StringIO
 from contextlib import closing
 from copy import deepcopy
-from misc import grem, split_every, EnsureEqual, Ensure, EnsureNotEqual, Error
+from misc import grem, split_every, EnsureEqual, Ensure, EnsureNotEqual, Error, \
+    as_csv
 from network_probability import NetworkProbability
 from psat_data import PsatData
 from psat_report import PsatReport
@@ -278,7 +279,7 @@ def scenario_to_psat(scenario, psat):
     return new_psat
 
 
-def batch_simulate(batch, psat, size=10, clean=True):
+def batch_simulate(batch, psat, size=10, clean=True, mismatch_file=None):
     """func batch_simulate       :: SimulationBatch, PsatData, Int -> 
        ----
        Simulate all Scenarios in `batch` (with a base of `psat`) in groups
@@ -310,6 +311,9 @@ def batch_simulate(batch, psat, size=10, clean=True):
                     scenario.result = "error"
                     # we probably shouldn't have this but it might cause error in matlab as it is expected.
                     new_psat = deepcopy(psat)
+                
+                if mismatch_file:
+                    mismatch_file.write(as_csv([scenario.title] + list(new_psat.get_stats())) + "\n")
     
                 new_psat_filename = "psat_" + scenario.title + ".m"
                 with open(new_psat_filename, "w") as new_psat_file:
@@ -335,7 +339,6 @@ def batch_simulate(batch, psat, size=10, clean=True):
                         print exce
                         scenario.result = "error"
                     
-    
             timer_end = time.clock()
             timer_time = (timer_end - timer_start)
             print "[b] batch time of", int(math.ceil(timer_time)), "seconds"

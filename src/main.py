@@ -179,6 +179,6 @@ if __name__ == '__main__':
     grem(".", r"summary.txt")
     # grem(".", r"stdout.txt")
     
-    generate_cases(2, 1000, True, True)
+    generate_cases(1000, 0, True, False)
     # run_this = test_case(True)
     

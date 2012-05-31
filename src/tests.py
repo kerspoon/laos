@@ -373,6 +373,13 @@ def test006():
         dosim("psat_e", simtype) 
         cycle("psat_e", "psat_f")   
         dosim("psat_f", simtype) 
+        
+        
+    def inner_text9():
+        copy_psat("psat_base", "psat_a")
+        dosim("psat_a", "opf")
+        
+        
 
 # test006()
 
@@ -416,6 +423,38 @@ def test007():
         batch.write(result_file)
 
 # test007()
+
+
+def test008():
+    clean = False
+    
+    def copy_psat(in_filename, out_filename):
+        psat = read_psat(in_filename + ".m")
+        with open(out_filename + ".m", "w") as psat_stream:
+            psat.write(psat_stream)
+            
+    def sim(psat, scenario_text):
+        scenario = text_to_scenario(scenario_text)
+        return simulate_scenario(psat, scenario, clean)
+        
+    data = """
+           [base] opf
+               set all demand 0.6
+           """
+
+    copy_psat("rts", "psat_base")
+    psat = read_psat("psat_base.m")
+    report = sim(psat, data)
+    print "base result = '" + str(report_in_limits(report)) + "'"
+    opf_psat = report_to_psat(report, psat)
+    opf_report = single_simulate(opf_psat, "pf", "one", clean)
+    print "opf result = '" + str(report_in_limits(opf_report)) + "'"
+    
+    opf_psat_2 = report_to_psat(opf_report, opf_psat)
+    opf_report_2 = single_simulate(opf_psat_2, "pf", "two", clean)
+    print "opf result 2 = '" + str(report_in_limits(opf_report_2)) + "'"
+    
+test008()
 
 # -----------------------------------------------------------------------------
 

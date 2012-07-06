@@ -145,12 +145,16 @@ def test_case(both=False, clean=False):
            [test_case] opf
            """
          
+            # remove generator g4
+            # remove generator g23
+            # set all demand 0.7
+
     data_2 = """
-             [test_case_2] opf
+             [test_case_2] pf
              """
            
     scenario = text_to_scenario(data)
-    psat = read_psat("rts.m")
+    psat = read_psat("rtskillmod.m")
     report = simulate_scenario(psat, scenario, clean)
     print "result = '" + str(report_in_limits(report)) + "'"
 
@@ -163,13 +167,13 @@ def test_case(both=False, clean=False):
         print "result 2 = '" + str(report_in_limits(report_2)) + "'"
         
 
-def profile(run_this='generate_cases(0, 100, True, False)'):
+def profile(run_this='generate_cases(1, 90, True, True)'):
     cProfile.run(run_this, 'foo.prof')
     print '-' * 80
     print '-' * 80
     print '-' * 80
     p = pstats.Stats('foo.prof')
-    p.strip_dirs().sort_stats(-1).get_stats()
+    p.strip_dirs().sort_stats(-1).print_stats()
 
 
 if __name__ == '__main__':
@@ -177,8 +181,9 @@ if __name__ == '__main__':
     grem(".", r"failure[0-9]*.txt")
     grem(".", r"outage[0-9]*.txt")
     grem(".", r"summary.txt")
-    # grem(".", r"stdout.txt")
+    grem(".", r"stdout.txt")
     
-    generate_cases(1000, 0, True, False)
-    # run_this = test_case(True)
+    # generate_cases(1000, 0, True, False)
+    # test_case(True)
+    # profile()
     

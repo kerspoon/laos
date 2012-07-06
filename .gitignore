@@ -5,3 +5,4 @@ ignore/*
 solve_*.m
 psat_*.m
 *.res
+src/foo.prof

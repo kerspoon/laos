@@ -361,7 +361,8 @@ def test006():
 
     def inner_text8():
         simtype = "opf"
-        copy_psat("psat_base", "psat_a")
+        # copy_psat("psat_base", "psat_a")
+        copy_kill_shunt_mod("psat_base", "psat_a")
         dosim("psat_a", simtype)
         cycle("psat_a", "psat_b")   
         dosim("psat_b", simtype) 
@@ -373,7 +374,7 @@ def test006():
         dosim("psat_e", simtype) 
         cycle("psat_e", "psat_f")   
         dosim("psat_f", simtype) 
-        
+    inner_text8()
         
     def inner_text9():
         copy_psat("psat_base", "psat_a")
@@ -381,7 +382,7 @@ def test006():
         
         
 
-# test006()
+test006()
 
 def test007():
     """batch and single should gave same results"""
@@ -454,7 +455,7 @@ def test008():
     opf_report_2 = single_simulate(opf_psat_2, "pf", "two", clean)
     print "opf result 2 = '" + str(report_in_limits(opf_report_2)) + "'"
     
-test008()
+# test008()
 
 # -----------------------------------------------------------------------------
 

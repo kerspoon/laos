@@ -379,6 +379,7 @@ class PsatData(object):
         TODO: make this only count scheduleable generators i.e. not wind farms
         """
         
+
         if self.mismatch != 0:
     
             scheduleable_generators = self.generators.values()
@@ -411,6 +412,19 @@ class PsatData(object):
             #print "-----"
              
     
+            # check nothing starts out of limits 
+            gnames = [gen.bus_no for gen in scheduleable_generators] + [slack.bus_no for slack in self.slack.values()]
+            
+            for idx in range(len(gpowers)):
+                if not(min_limit[idx] <= gpowers[idx] <= max_limit[idx]):
+
+                    print "Power (#%d - bus(%d)) started out of limit (%f<=%f<=%f)" % (
+                        idx,
+                        gnames[idx],
+                        min_limit[idx],
+                        gpowers[idx],
+                        max_limit[idx])
+
             res = fix_mismatch(-self.mismatch, gpowers, min_limit, max_limit)
     
             for newp, generator in zip(res, scheduleable_generators):
@@ -434,7 +448,7 @@ class PsatData(object):
             max_bid = sum(s.p_bid_max for s in supplies)
             min_bid = sum(s.p_bid_min for s in supplies)
 
-            if not (min_bid <= generator.p <= max_bid):
+            if not (generator.p == 0 or min_bid <= generator.p <= max_bid):
                 print "generator", bus_no , "power limit:",
                 print min_bid, "<=", generator.p, "<=", max_bid
                 inlimit = False
@@ -556,7 +570,7 @@ def fix_mismatch(mismatch, power, min_limit, max_limit):
   
     # check nothing is out of limits 
     for idx in range(len(power)):
-        Ensure(min_limit[idx] <= power[idx] <= max_limit[idx],
+        Ensure(power[idx] == 0 or (min_limit[idx] <= power[idx] <= max_limit[idx]),
                "Power (%d) out of limit (%f<=%f<=%f)" % (idx,
                                                          min_limit[idx],
                                                          power[idx],
